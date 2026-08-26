@@ -31,3 +31,9 @@ This command removes only WhatsClean's download quarantine marker. Do not
 disable Gatekeeper or change your Mac's global security settings.
 
 Approval is required only for the first launch of each downloaded version.
+
+FIRST APP LAUNCH
+
+Click Grant WhatsApp Access. WhatsClean opens the expected WhatsApp data
+location automatically. Select the highlighted folder and click Grant Access.
+This folder permission is stored and reused on future launches.

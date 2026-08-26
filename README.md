@@ -12,6 +12,8 @@ Built for Apple Silicon and macOS 12 or later.
 - Schedule daily cleanup of files older than seven days.
 - Check for and install updates directly from the app with Sparkle.
 - Show or hide the optional menu bar icon.
+- Use the system appearance or choose Light or Dark mode.
+- Grant persistent access to the detected WhatsApp folder with one guided click.
 
 ## Install
 
@@ -26,6 +28,10 @@ xattr -dr com.apple.quarantine /Applications/WhatsClean.app
 ```
 
 This is required only for the first launch after installation.
+
+On the first app launch, click **Grant WhatsApp Access**. WhatsClean opens the
+expected WhatsApp data location automatically; select the highlighted folder
+and click **Grant Access**. The choice is stored and reused on future launches.
 
 ## Updates
 

@@ -177,6 +177,145 @@ final class ThumbnailCache {
     }()
 }
 
+enum WhatsAppFolderAccess {
+    private static let bookmarkKey = "WhatsAppMediaFolderBookmark"
+    private static let standardContainer = "group.net.whatsapp.WhatsApp.shared"
+    private static let businessContainer = "group.net.whatsapp.WhatsAppSMB.shared"
+
+    static var hasSelection: Bool {
+        authorizedMediaRoot() != nil
+    }
+
+    static var selectedFolderName: String? {
+        guard let url = resolveURL() else { return nil }
+        return url.pathComponents.contains(businessContainer) ? "WhatsApp Business" : "WhatsApp"
+    }
+
+    static func resolveURL() -> URL? {
+        guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
+        var isStale = false
+
+        if let url = try? URL(
+            resolvingBookmarkData: data,
+            options: [.withSecurityScope],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ) {
+            if isStale { try? save(url) }
+            return url
+        }
+
+        if let url = try? URL(
+            resolvingBookmarkData: data,
+            options: [],
+            relativeTo: nil,
+            bookmarkDataIsStale: &isStale
+        ) {
+            if isStale { try? save(url) }
+            return url
+        }
+        return nil
+    }
+
+    @MainActor
+    static func requestAccess() -> Bool {
+        let panel = NSOpenPanel()
+        panel.title = "Grant WhatsApp Access"
+        panel.message = "WhatsClean has opened the expected WhatsApp media folder. Click Grant Access to continue."
+        panel.prompt = "Grant Access"
+        panel.canChooseFiles = false
+        panel.canChooseDirectories = true
+        panel.allowsMultipleSelection = false
+        panel.resolvesAliases = true
+
+        let media = suggestedContainerURL()
+            .appendingPathComponent("Message", isDirectory: true)
+            .appendingPathComponent("Media", isDirectory: true)
+        panel.directoryURL = media
+
+        guard panel.runModal() == .OK, let selectedURL = panel.url else { return false }
+        guard authorizedMediaRoot(from: selectedURL) != nil else {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Choose the WhatsApp Folder"
+            alert.informativeText = "For your safety, WhatsClean only accepts the official WhatsApp or WhatsApp Business data folder. No other app folders will be scanned."
+            alert.runModal()
+            return false
+        }
+        do {
+            try save(selectedURL)
+            NotificationCenter.default.post(name: .whatsAppFolderChanged, object: nil)
+            return true
+        } catch {
+            let alert = NSAlert()
+            alert.alertStyle = .warning
+            alert.messageText = "Access Could Not Be Saved"
+            alert.informativeText = error.localizedDescription
+            alert.runModal()
+            return false
+        }
+    }
+
+    @MainActor
+    private static func suggestedContainerURL() -> URL {
+        let home = FileManager.default.homeDirectoryForCurrentUser
+        let groupContainers = home.appendingPathComponent("Library/Group Containers", isDirectory: true)
+        let standard = groupContainers.appendingPathComponent(standardContainer, isDirectory: true)
+        let business = groupContainers.appendingPathComponent(businessContainer, isDirectory: true)
+
+        let hasStandardApp = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "net.whatsapp.WhatsApp") != nil
+        let hasBusinessApp = NSWorkspace.shared.urlForApplication(withBundleIdentifier: "net.whatsapp.WhatsAppSMB") != nil
+        return hasBusinessApp && !hasStandardApp ? business : standard
+    }
+
+    static func authorizedMediaRoot() -> URL? {
+        guard let selectedURL = resolveURL() else { return nil }
+        return authorizedMediaRoot(from: selectedURL)
+    }
+
+    private static func authorizedMediaRoot(from selectedURL: URL) -> URL? {
+        let url = selectedURL.standardizedFileURL
+        let components = url.pathComponents
+        guard let containerIndex = components.firstIndex(where: {
+            $0 == standardContainer || $0 == businessContainer
+        }) else { return nil }
+
+        let remainder = Array(components.dropFirst(containerIndex + 1))
+        let containerURL = URL(fileURLWithPath: NSString.path(withComponents: Array(components.prefix(containerIndex + 1))), isDirectory: true)
+
+        if remainder.isEmpty {
+            return containerURL
+                .appendingPathComponent("Message", isDirectory: true)
+                .appendingPathComponent("Media", isDirectory: true)
+        }
+        if remainder == ["Message"] {
+            return url.appendingPathComponent("Media", isDirectory: true)
+        }
+        if remainder == ["Message", "Media"] {
+            return url
+        }
+        return nil
+    }
+
+    private static func save(_ url: URL) throws {
+        let data: Data
+        do {
+            data = try url.bookmarkData(
+                options: [.withSecurityScope],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+        } catch {
+            data = try url.bookmarkData(
+                options: [.minimalBookmark],
+                includingResourceValuesForKeys: nil,
+                relativeTo: nil
+            )
+        }
+        UserDefaults.standard.set(data, forKey: bookmarkKey)
+    }
+}
+
 struct AsyncThumbnailView: View {
     let item: MediaItem
     @State private var thumbnail: NSImage? = nil
@@ -265,6 +404,7 @@ class MediaScanner: ObservableObject {
     @Published var olderThan7DaysSizeString: String = "0 B"
     @Published var isScanning = false
     @Published var statusMessage: String?
+    @Published var lastRefreshedAt: Date?
 
     struct ScanResult: Sendable {
         let items: [MediaItem]
@@ -281,19 +421,19 @@ class MediaScanner: ObservableObject {
             return [URL(fileURLWithPath: testRoot, isDirectory: true)]
         }
 #endif
-        let home = FileManager.default.homeDirectoryForCurrentUser
-        let specificDirs: [URL] = [
-            home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.WhatsApp.shared/Message/Media"),
-            home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.WhatsAppSMB.shared/Message/Media"),
-            home.appendingPathComponent("Library/Application Support/WhatsApp/Message/Media"),
-            home.appendingPathComponent("Library/Application Support/WhatsApp Web")
-        ]
-
-        return specificDirs.filter { FileManager.default.fileExists(atPath: $0.path) }
+        guard let mediaRoot = WhatsAppFolderAccess.authorizedMediaRoot() else { return [] }
+        return [mediaRoot]
     }
 
     nonisolated static func scanSynchronously() -> ScanResult {
         let roots = getMediaRoots()
+        let authorizedFolder = WhatsAppFolderAccess.resolveURL()
+        let isAccessingAuthorizedFolder = authorizedFolder?.startAccessingSecurityScopedResource() == true
+        defer {
+            if isAccessingAuthorizedFolder {
+                authorizedFolder?.stopAccessingSecurityScopedResource()
+            }
+        }
         var scanned: [MediaItem] = []
         var seenFiles = Set<String>()
         var totalBytes: Int64 = 0
@@ -393,6 +533,7 @@ class MediaScanner: ObservableObject {
                 MediaScanner.scanSynchronously()
             }.value
             apply(result)
+            lastRefreshedAt = Date()
             isScanning = false
         }
     }
@@ -406,9 +547,9 @@ class MediaScanner: ObservableObject {
         totalSizeString = bcf.string(fromByteCount: result.totalBytes)
         olderThan7DaysSizeString = bcf.string(fromByteCount: result.oldBytes)
         if result.rootsFound == 0 {
-            statusMessage = "No WhatsApp media folders were found. Open WhatsApp and download some media before refreshing."
+            statusMessage = "Grant access to WhatsApp data to begin scanning."
         } else if result.inaccessibleRoots > 0 {
-            statusMessage = "macOS blocked access to a WhatsApp folder. Allow WhatsClean in System Settings > Privacy & Security > Full Disk Access."
+            statusMessage = "WhatsApp access is no longer available. Open WhatsClean Settings and grant folder access again."
         } else {
             statusMessage = nil
         }
@@ -442,6 +583,7 @@ struct ContentView: View {
     @State private var showAutoCleanConfirmation: Bool = false
     @State private var showAutoCleanFeedbackAlert: Bool = false
     @State private var operationMessage: String?
+    @State private var hasMediaAccess = WhatsAppFolderAccess.hasSelection
 
     let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
 
@@ -514,9 +656,23 @@ struct ContentView: View {
                 .disabled(scanner.olderThan7DaysCount == 0)
 
                 Button(action: { scanner.scan() }) {
-                    Label("Refresh", systemImage: "arrow.clockwise")
+                    if scanner.isScanning {
+                        HStack(spacing: 5) {
+                            ProgressView()
+                                .controlSize(.small)
+                            Text("Refreshing…")
+                        }
+                    } else {
+                        Label("Refresh", systemImage: "arrow.clockwise")
+                    }
                 }
+                .disabled(scanner.isScanning || !hasMediaAccess)
                 .help("Refresh media list")
+
+                Button(action: openSettings) {
+                    Label("Settings", systemImage: "gearshape")
+                }
+                .help("Open WhatsClean settings")
                 }
             }
             .padding(.horizontal, 14)
@@ -567,7 +723,26 @@ struct ContentView: View {
                 .width(160)
             }
             .overlay {
-                if scanner.isScanning && scanner.items.isEmpty {
+                if !hasMediaAccess {
+                    VStack(spacing: 12) {
+                        Image(systemName: "hand.raised.circle")
+                            .font(.system(size: 38))
+                            .foregroundColor(.accentColor)
+                        Text("WhatsApp Access Required")
+                            .font(.headline)
+                        Text("WhatsClean will open the correct WhatsApp location for you. Select the highlighted folder and grant access once.")
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 440)
+                        Button("Grant WhatsApp Access") {
+                            hasMediaAccess = WhatsAppFolderAccess.requestAccess()
+                            if hasMediaAccess { scanner.scan() }
+                        }
+                        .buttonStyle(.borderedProminent)
+                    }
+                    .padding(24)
+                } else if scanner.isScanning && scanner.items.isEmpty {
                     ProgressView("Scanning media…")
                 } else if let message = scanner.statusMessage, scanner.items.isEmpty {
                     VStack(spacing: 10) {
@@ -601,6 +776,15 @@ struct ContentView: View {
                 Text("\(filteredItems.count) file(s) • Total: \(scanner.totalSizeString)")
                     .font(.callout).foregroundColor(.secondary)
                 Spacer()
+                if scanner.isScanning {
+                    Text("Refreshing…")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                } else if let lastRefreshedAt = scanner.lastRefreshedAt {
+                    Text("Updated \(lastRefreshedAt, style: .time)")
+                        .font(.caption)
+                        .foregroundColor(.secondary)
+                }
                 }
 
                 HStack(spacing: 10) {
@@ -675,8 +859,21 @@ struct ContentView: View {
         } message: {
             Text("Once a day, WhatsClean will automatically move WhatsApp media older than seven days to the Trash. You can disable this setting at any time.")
         }
-        .onAppear { scanner.scan() }
-        .onReceive(timer) { _ in scanner.scan() }
+        .onAppear {
+            hasMediaAccess = WhatsAppFolderAccess.hasSelection
+            if hasMediaAccess { scanner.scan() }
+        }
+        .onReceive(timer) { _ in
+            if hasMediaAccess { scanner.scan() }
+        }
+        .onReceive(NotificationCenter.default.publisher(for: .whatsAppFolderChanged)) { _ in
+            hasMediaAccess = WhatsAppFolderAccess.hasSelection
+            if hasMediaAccess { scanner.scan() }
+        }
+    }
+
+    private func openSettings() {
+        SettingsWindowController.shared.show()
     }
 
     private func getSelectedURLs() -> [URL] {
@@ -785,13 +982,54 @@ final class UpdateManager: ObservableObject {
     }
 }
 
+enum AppAppearance: String, CaseIterable, Identifiable {
+    case system = "System"
+    case light = "Light"
+    case dark = "Dark"
+
+    var id: String { rawValue }
+
+    var colorScheme: ColorScheme? {
+        switch self {
+        case .system: return nil
+        case .light: return .light
+        case .dark: return .dark
+        }
+    }
+}
+
 struct WhatsCleanSettingsView: View {
     @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
+    @AppStorage("appAppearance") private var appAppearance = AppAppearance.system.rawValue
     @ObservedObject private var updates = UpdateManager.shared
+    @State private var selectedFolderName = WhatsAppFolderAccess.selectedFolderName
 
     var body: some View {
         Form {
+            Section("WhatsApp Access") {
+                HStack {
+                    Text(selectedFolderName ?? "Not granted")
+                        .foregroundColor(.secondary)
+                    Spacer()
+                    Button(selectedFolderName == nil ? "Grant Access…" : "Change Folder…") {
+                        if WhatsAppFolderAccess.requestAccess() {
+                            selectedFolderName = WhatsAppFolderAccess.selectedFolderName
+                        }
+                    }
+                }
+                Text("WhatsClean remembers this choice and reuses it on future launches.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+            }
+
             Section("General") {
+                Picker("Appearance", selection: $appAppearance) {
+                    ForEach(AppAppearance.allCases) { appearance in
+                        Text(appearance.rawValue).tag(appearance.rawValue)
+                    }
+                }
+                .pickerStyle(.segmented)
+
                 Toggle("Show WhatsClean in the menu bar", isOn: $showMenuBarIcon)
                     .onChange(of: showMenuBarIcon) { _ in
                         NotificationCenter.default.post(name: .menuBarPreferenceChanged, object: nil)
@@ -821,11 +1059,40 @@ struct WhatsCleanSettingsView: View {
         }
         .padding(24)
         .frame(width: 480)
+        .preferredColorScheme(AppAppearance(rawValue: appAppearance)?.colorScheme)
+    }
+}
+
+@MainActor
+final class SettingsWindowController: NSWindowController {
+    static let shared = SettingsWindowController()
+
+    private init() {
+        let hostingController = NSHostingController(rootView: WhatsCleanSettingsView())
+        let window = NSWindow(contentViewController: hostingController)
+        window.title = "WhatsClean Settings"
+        window.styleMask = [.titled, .closable, .miniaturizable]
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 480, height: 460))
+        window.center()
+        super.init(window: window)
+    }
+
+    required init?(coder: NSCoder) {
+        fatalError("init(coder:) has not been implemented")
+    }
+
+    func show() {
+        NSApp.activate(ignoringOtherApps: true)
+        window?.center()
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
     }
 }
 
 extension Notification.Name {
     static let menuBarPreferenceChanged = Notification.Name("WhatsCleanMenuBarPreferenceChanged")
+    static let whatsAppFolderChanged = Notification.Name("WhatsCleanWhatsAppFolderChanged")
 }
 
 @MainActor
@@ -887,8 +1154,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
     }
 
     @objc private func showSettings() {
-        NSApp.activate(ignoringOtherApps: true)
-        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+        SettingsWindowController.shared.show()
     }
 }
 
@@ -896,6 +1162,7 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 @main
 struct WhatsCleanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
+    @AppStorage("appAppearance") private var appAppearance = AppAppearance.system.rawValue
 
     init() {
         if CommandLine.arguments.contains("--clean-7days") {
@@ -909,8 +1176,18 @@ struct WhatsCleanApp: App {
     }
 
     var body: some Scene {
-        WindowGroup { ContentView() }
-        Settings { WhatsCleanSettingsView() }
+        WindowGroup {
+            ContentView()
+                .preferredColorScheme(AppAppearance(rawValue: appAppearance)?.colorScheme)
+        }
+        .commands {
+            CommandGroup(replacing: .appSettings) {
+                Button("Settings…") {
+                    SettingsWindowController.shared.show()
+                }
+                .keyboardShortcut(",", modifiers: .command)
+            }
+        }
     }
 }
 #endif
