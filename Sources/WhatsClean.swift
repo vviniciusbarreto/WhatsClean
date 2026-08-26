@@ -151,6 +151,7 @@ final class AutoCleanerManager: ObservableObject {
         let plist: [String: Any] = [
             "Label": launchAgentLabel,
             "ProgramArguments": [exe, "--clean-7days"],
+            "RunAtLoad": true,
             "StartInterval": 86400
         ]
         do {
@@ -690,8 +691,16 @@ struct ContentView: View {
                             .lineLimit(1)
                     }
                 }
-                .buttonStyle(.borderedProminent)
-                .tint(autoCleaner.isEnabled ? .green : .secondary)
+                .padding(.horizontal, 10)
+                .padding(.vertical, 6)
+                .foregroundColor(autoCleaner.isEnabled ? .white : .primary)
+                .background(autoCleaner.isEnabled ? Color.green : Color(NSColor.controlBackgroundColor))
+                .clipShape(RoundedRectangle(cornerRadius: 7, style: .continuous))
+                .overlay {
+                    RoundedRectangle(cornerRadius: 7, style: .continuous)
+                        .stroke(Color.primary.opacity(autoCleaner.isEnabled ? 0 : 0.12), lineWidth: 1)
+                }
+                .buttonStyle(.plain)
                 .help("Automatically clean files older than seven days every 24 hours")
 
                 Button(action: { showDelete7DaysAlert = true }) {
@@ -906,7 +915,7 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Once a day, WhatsClean will automatically move WhatsApp media older than seven days to the Trash. You can disable this setting at any time.")
+            Text("WhatsClean will clean eligible media now, then once a day it will automatically move WhatsApp media older than seven days to the Trash. You can disable this setting at any time.")
         }
         .onAppear {
             hasMediaAccess = WhatsAppFolderAccess.hasSelection

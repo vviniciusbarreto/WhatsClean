@@ -82,6 +82,7 @@
 "Enable automatic cleanup?" = "Ativar a limpeza automática?";
 "Enable" = "Ativar";
 "Once a day, WhatsClean will automatically move WhatsApp media older than seven days to the Trash. You can disable this setting at any time." = "Uma vez por dia, o WhatsClean moverá automaticamente para o Lixo as mídias do WhatsApp com mais de sete dias. Você pode desativar esta opção a qualquer momento.";
+"WhatsClean will clean eligible media now, then once a day it will automatically move WhatsApp media older than seven days to the Trash. You can disable this setting at any time." = "O WhatsClean limpará agora as mídias elegíveis e, depois, uma vez por dia moverá automaticamente para o Lixo as mídias do WhatsApp com mais de sete dias. Você pode desativar esta opção a qualquer momento.";
 "Clean 7d+ (%lld)" = "Limpar 7d+ (%lld)";
 "%lld file(s) • Total: %@" = "%lld arquivo(s) • Total: %@";
 "Found %lld file(s) older than seven days (%@). They will be moved to the Trash to free up space." = "Foram encontrados %lld arquivo(s) com mais de sete dias (%@). Eles serão movidos para o Lixo para liberar espaço.";

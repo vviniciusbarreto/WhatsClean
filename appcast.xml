@@ -3,6 +3,26 @@
     <channel>
         <title>WhatsClean</title>
         <item>
+            <title>1.1.1</title>
+            <pubDate>Wed, 26 Aug 2026 17:24:43 -0300</pubDate>
+            <link>https://github.com/vviniciusbarreto/WhatsClean</link>
+            <sparkle:version>7</sparkle:version>
+            <sparkle:shortVersionString>1.1.1</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.1.1
+
+## Auto (7d) fixes
+
+- Fixed Auto (7d) waiting up to 24 hours before its first cleanup after being enabled or restored following an app update.
+- Automatic cleanup now runs once immediately when its LaunchAgent is loaded, then continues every 24 hours.
+- Fixed the enabled Auto (7d) button appearing gray even though its status said ON.
+- The active state now uses an explicit green style that remains visually clear across macOS appearances.
+- Updated the confirmation text to explain that the first eligible cleanup starts immediately.
+]]></description>
+            <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.1.1/WhatsClean-1.1.1-arm64.zip" length="2465264" type="application/octet-stream" sparkle:edSignature="9w8K3Z03bDTvYN7HD0AwvgU7hXzmwkw1/bM+DHrY1EkIbc1HvB3jyekP5IFZOVQ+sVQo4Kcw/hfsdRxycku/DA=="/>
+        </item>
+        <item>
             <title>1.1.0</title>
             <pubDate>Wed, 26 Aug 2026 17:12:22 -0300</pubDate>
             <link>https://github.com/vviniciusbarreto/WhatsClean</link>
@@ -51,25 +71,6 @@
 - Manual **Check for Updates Now** behavior remains unchanged.
 ]]></description>
             <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.0.4/WhatsClean-1.0.4-arm64.zip" length="2430999" type="application/octet-stream" sparkle:edSignature="PzPZvkmXfTB8MTDHOKqbxNKhqcf8COnzlUuslxdlFC6miTm1pi//URMOmooFQyOmChoQgxDtlJ08YLRbQUBlDg=="/>
-        </item>
-        <item>
-            <title>1.0.3</title>
-            <pubDate>Wed, 26 Aug 2026 16:19:42 -0300</pubDate>
-            <link>https://github.com/vviniciusbarreto/WhatsClean</link>
-            <sparkle:version>4</sparkle:version>
-            <sparkle:shortVersionString>1.0.3</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.0.3
-
-## Bug fix
-
-- Fixed a case where **Auto (7d)** could appear disabled or lose its scheduled LaunchAgent after the app was replaced by a Sparkle update.
-- The automatic-cleanup preference is now stored independently and restored when an update replaces the application bundle.
-- Existing enabled installations are migrated automatically from their current LaunchAgent.
-- The LaunchAgent is validated and re-registered when the app build changes, keeping the schedule linked to the updated executable.
-]]></description>
-            <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.0.3/WhatsClean-1.0.3-arm64.zip" length="2430979" type="application/octet-stream" sparkle:edSignature="1l8ttTqAn/Ub9/fsDR7kmu/YUKqBfGbF5Xl6xPg3/vgN1Ofni11EpB44YJT1KR5pc06ozb/DZwsSOKkFFo2yBQ=="/>
         </item>
     </channel>
 </rss>
