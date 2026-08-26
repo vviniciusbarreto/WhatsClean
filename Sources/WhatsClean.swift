@@ -9,11 +9,11 @@ import Sparkle
 private let appLogger = Logger(subsystem: "com.vviniciusbarreto.whatsclean", category: "lifecycle")
 
 enum MediaCategory: String, CaseIterable, Identifiable, Sendable {
-    case all = "Todos"
-    case images = "Imagens"
-    case videos = "Vídeos"
-    case audio = "Áudios"
-    case docs = "Documentos"
+    case all = "All"
+    case images = "Images"
+    case videos = "Videos"
+    case audio = "Audio"
+    case docs = "Documents"
     var id: String { self.rawValue }
     var icon: String {
         switch self {
@@ -113,7 +113,7 @@ final class AutoCleanerManager: ObservableObject {
         let exe = executablePath
         let applications = ["/Applications/", FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path + "/"]
         guard applications.contains(where: { exe.hasPrefix($0) }) else {
-            feedbackMessage = "Instale o WhatsClean na pasta Aplicativos antes de ativar a limpeza automática."
+            feedbackMessage = "Install WhatsClean in the Applications folder before enabling automatic cleanup."
             isEnabled = false
             return
         }
@@ -134,14 +134,14 @@ final class AutoCleanerManager: ObservableObject {
             guard status == 0 else {
                 try? FileManager.default.removeItem(at: plistURL)
                 throw NSError(domain: "WhatsClean", code: Int(status), userInfo: [
-                    NSLocalizedDescriptionKey: "O macOS recusou o agendamento da limpeza automática."
+                    NSLocalizedDescriptionKey: "macOS refused to schedule automatic cleanup."
                 ])
             }
             isEnabled = true
-            feedbackMessage = "A limpeza automática diária foi ativada."
+            feedbackMessage = "Daily automatic cleanup is enabled."
         } catch {
             isEnabled = false
-            feedbackMessage = "Não foi possível ativar a limpeza automática: \(error.localizedDescription)"
+            feedbackMessage = "Automatic cleanup could not be enabled: \(error.localizedDescription)"
         }
     }
 
@@ -149,7 +149,7 @@ final class AutoCleanerManager: ObservableObject {
         _ = runLaunchctl(["unload", plistURL.path])
         try? FileManager.default.removeItem(at: plistURL)
         self.isEnabled = false
-        feedbackMessage = "A limpeza automática foi desativada."
+        feedbackMessage = "Automatic cleanup is disabled."
     }
 
     private func runLaunchctl(_ arguments: [String]) -> Int32 {
@@ -406,9 +406,9 @@ class MediaScanner: ObservableObject {
         totalSizeString = bcf.string(fromByteCount: result.totalBytes)
         olderThan7DaysSizeString = bcf.string(fromByteCount: result.oldBytes)
         if result.rootsFound == 0 {
-            statusMessage = "Nenhuma pasta de mídia do WhatsApp foi encontrada. Abra o WhatsApp e baixe alguma mídia antes de recarregar."
+            statusMessage = "No WhatsApp media folders were found. Open WhatsApp and download some media before refreshing."
         } else if result.inaccessibleRoots > 0 {
-            statusMessage = "O macOS impediu o acesso a uma pasta do WhatsApp. Autorize o WhatsClean em Ajustes do Sistema > Privacidade e Segurança > Acesso Total ao Disco."
+            statusMessage = "macOS blocked access to a WhatsApp folder. Allow WhatsClean in System Settings > Privacy & Security > Full Disk Access."
         } else {
             statusMessage = nil
         }
@@ -457,19 +457,19 @@ struct ContentView: View {
         VStack(spacing: 0) {
             VStack(spacing: 8) {
                 HStack(spacing: 12) {
-                Picker("Categoria", selection: $selectedCategory) {
+                Picker("Category", selection: $selectedCategory) {
                     ForEach(MediaCategory.allCases) { cat in
                         Label(cat.rawValue, systemImage: cat.icon).tag(cat)
                     }
                 }
                 .pickerStyle(.segmented)
                 .labelsHidden()
-                .accessibilityLabel("Categoria")
+                .accessibilityLabel("Category")
                 .frame(minWidth: 240, maxWidth: .infinity)
 
                 HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                    TextField("Buscar...", text: $searchText).textFieldStyle(.plain)
+                    TextField("Search...", text: $searchText).textFieldStyle(.plain)
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
                             Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
@@ -501,12 +501,12 @@ struct ContentView: View {
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(autoCleaner.isEnabled ? .green : .secondary)
-                .help("Limpeza automática em segundo plano a cada 24h para arquivos com mais de 7 dias")
+                .help("Automatically clean files older than seven days every 24 hours")
 
                 Button(action: { showDelete7DaysAlert = true }) {
                     HStack(spacing: 5) {
                         Image(systemName: "trash.circle")
-                        Text("Limpar +7d (\(scanner.olderThan7DaysCount))")
+                        Text("Clean 7d+ (\(scanner.olderThan7DaysCount))")
                             .lineLimit(1)
                     }
                 }
@@ -514,9 +514,9 @@ struct ContentView: View {
                 .disabled(scanner.olderThan7DaysCount == 0)
 
                 Button(action: { scanner.scan() }) {
-                    Label("Recarregar", systemImage: "arrow.clockwise")
+                    Label("Refresh", systemImage: "arrow.clockwise")
                 }
-                .help("Recarregar lista de mídias")
+                .help("Refresh media list")
                 }
             }
             .padding(.horizontal, 14)
@@ -526,12 +526,12 @@ struct ContentView: View {
             Divider()
 
             Table(filteredItems, selection: $selectedItems) {
-                TableColumn("Prévia") { item in
+                TableColumn("Preview") { item in
                     AsyncThumbnailView(item: item)
                 }
                 .width(42)
 
-                TableColumn("Nome") { item in
+                TableColumn("Name") { item in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.name)
                             .lineLimit(1)
@@ -543,7 +543,7 @@ struct ContentView: View {
                 }
                 .width(min: 220, ideal: 340)
 
-                TableColumn("Formato") { item in
+                TableColumn("Format") { item in
                     Text(item.ext)
                         .font(.caption.bold())
                         .padding(.horizontal, 6)
@@ -553,13 +553,13 @@ struct ContentView: View {
                 }
                 .width(70)
 
-                TableColumn("Tamanho") { item in
+                TableColumn("Size") { item in
                     Text(item.sizeFormatted)
                         .font(.system(.body, design: .monospaced))
                 }
                 .width(95)
 
-                TableColumn("Data") { item in
+                TableColumn("Date") { item in
                     Text(item.dateFormatted)
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(item.isOlderThan7Days ? .orange : .secondary)
@@ -568,13 +568,13 @@ struct ContentView: View {
             }
             .overlay {
                 if scanner.isScanning && scanner.items.isEmpty {
-                    ProgressView("Procurando mídias…")
+                    ProgressView("Scanning media…")
                 } else if let message = scanner.statusMessage, scanner.items.isEmpty {
                     VStack(spacing: 10) {
                         Image(systemName: "folder.badge.questionmark")
                             .font(.system(size: 34))
                             .foregroundColor(.secondary)
-                        Text("Mídias indisponíveis")
+                        Text("Media unavailable")
                             .font(.headline)
                         Text(message)
                             .font(.callout)
@@ -586,19 +586,19 @@ struct ContentView: View {
                 }
             }
             .contextMenu {
-                Button("Quick Look (Espaço)") { quickLookSelected() }
-                Button("Abrir no App Padrão") { openSelected() }
-                Button("Revelar no Finder") { revealSelected() }
-                Button("Salvar em Downloads") { saveSelected() }
+                Button("Quick Look (Space)") { quickLookSelected() }
+                Button("Open with Default App") { openSelected() }
+                Button("Show in Finder") { revealSelected() }
+                Button("Save to Downloads") { saveSelected() }
                 Divider()
-                Button("Mover para o Lixo", role: .destructive) { showDeleteSelectedAlert = true }
+                Button("Move to Trash", role: .destructive) { showDeleteSelectedAlert = true }
             }
 
             Divider()
 
             VStack(spacing: 8) {
                 HStack {
-                Text("\(filteredItems.count) arquivo(s) • Total: \(scanner.totalSizeString)")
+                Text("\(filteredItems.count) file(s) • Total: \(scanner.totalSizeString)")
                     .font(.callout).foregroundColor(.secondary)
                 Spacer()
                 }
@@ -612,22 +612,22 @@ struct ContentView: View {
                 .keyboardShortcut(.space, modifiers: [])
 
                 Button(action: openSelected) {
-                    Label("Abrir", systemImage: "arrow.up.forward.app")
+                    Label("Open", systemImage: "arrow.up.forward.app")
                 }
                 .disabled(selectedItems.isEmpty)
 
                 Button(action: revealSelected) {
-                    Label("No Finder", systemImage: "folder")
+                    Label("Finder", systemImage: "folder")
                 }
                 .disabled(selectedItems.isEmpty)
 
                 Button(action: saveSelected) {
-                    Label("Salvar", systemImage: "arrow.down.circle")
+                    Label("Save", systemImage: "arrow.down.circle")
                 }
                 .disabled(selectedItems.isEmpty)
 
                 Button(role: .destructive, action: { showDeleteSelectedAlert = true }) {
-                    Label("Mover para o Lixo", systemImage: "trash")
+                    Label("Move to Trash", systemImage: "trash")
                 }
                 .disabled(selectedItems.isEmpty)
                 }
@@ -638,22 +638,22 @@ struct ContentView: View {
         }
         .frame(minWidth: 680, minHeight: 500)
         .navigationTitle("WhatsClean")
-        .alert("Limpar Mídias com mais de 7 dias?", isPresented: $showDelete7DaysAlert) {
-            Button("Mover para o Lixo", role: .destructive) {
+        .alert("Clean media older than seven days?", isPresented: $showDelete7DaysAlert) {
+            Button("Move to Trash", role: .destructive) {
                 let result = scanner.deleteOlderThan7Days()
                 operationMessage = deletionMessage(deleted: result.deleted, failed: result.failed)
             }
-            Button("Cancelar", role: .cancel) { }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Foram encontrados \(scanner.olderThan7DaysCount) arquivo(s) com mais de 7 dias (\(scanner.olderThan7DaysSizeString)). Eles serão movidos para o Lixo do Mac para liberar espaço.")
+            Text("Found \(scanner.olderThan7DaysCount) file(s) older than seven days (\(scanner.olderThan7DaysSizeString)). They will be moved to the Trash to free up space.")
         }
-        .alert("Mover arquivos selecionados para o Lixo?", isPresented: $showDeleteSelectedAlert) {
-            Button("Mover para o Lixo", role: .destructive) { deleteSelected() }
-            Button("Cancelar", role: .cancel) { }
+        .alert("Move selected files to the Trash?", isPresented: $showDeleteSelectedAlert) {
+            Button("Move to Trash", role: .destructive) { deleteSelected() }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Os \(selectedItems.count) arquivo(s) selecionados serão movidos para o Lixo do Mac.")
+            Text("The \(selectedItems.count) selected file(s) will be moved to the Trash.")
         }
-        .alert("Resultado da operação", isPresented: Binding(
+        .alert("Operation Result", isPresented: Binding(
             get: { operationMessage != nil },
             set: { if !$0 { operationMessage = nil } }
         )) {
@@ -661,19 +661,19 @@ struct ContentView: View {
         } message: {
             Text(operationMessage ?? "")
         }
-        .alert(autoCleaner.isEnabled ? "Auto-Limpeza Ativada com Sucesso!" : "Auto-Limpeza Desativada", isPresented: $showAutoCleanFeedbackAlert) {
+        .alert(autoCleaner.isEnabled ? "Automatic Cleanup Enabled" : "Automatic Cleanup Disabled", isPresented: $showAutoCleanFeedbackAlert) {
             Button("OK") { }
         } message: {
-            Text(autoCleaner.feedbackMessage ?? "A configuração da limpeza automática foi atualizada.")
+            Text(autoCleaner.feedbackMessage ?? "The automatic cleanup setting was updated.")
         }
-        .alert("Ativar limpeza automática?", isPresented: $showAutoCleanConfirmation) {
-            Button("Ativar", role: .destructive) {
+        .alert("Enable automatic cleanup?", isPresented: $showAutoCleanConfirmation) {
+            Button("Enable", role: .destructive) {
                 autoCleaner.enable()
                 showAutoCleanFeedbackAlert = true
             }
-            Button("Cancelar", role: .cancel) { }
+            Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Uma vez por dia, o WhatsClean moverá automaticamente para o Lixo as mídias do WhatsApp com mais de 7 dias. Você poderá desativar essa opção a qualquer momento.")
+            Text("Once a day, WhatsClean will automatically move WhatsApp media older than seven days to the Trash. You can disable this setting at any time.")
         }
         .onAppear { scanner.scan() }
         .onReceive(timer) { _ in scanner.scan() }
@@ -709,7 +709,7 @@ struct ContentView: View {
             do {
                 try FileManager.default.copyItem(at: u, to: dest)
             } catch {
-                operationMessage = "Não foi possível salvar \(u.lastPathComponent): \(error.localizedDescription)"
+                operationMessage = "Could not save \(u.lastPathComponent): \(error.localizedDescription)"
             }
         }
     }
@@ -745,8 +745,8 @@ struct ContentView: View {
     }
 
     private func deletionMessage(deleted: Int, failed: Int) -> String {
-        if failed == 0 { return "\(deleted) arquivo(s) movido(s) para o Lixo." }
-        return "\(deleted) arquivo(s) movido(s) para o Lixo; \(failed) não puderam ser movidos. Verifique as permissões do macOS."
+        if failed == 0 { return "\(deleted) file(s) moved to the Trash." }
+        return "\(deleted) file(s) moved to the Trash; \(failed) could not be moved. Check macOS permissions."
     }
 }
 
@@ -791,30 +791,30 @@ struct WhatsCleanSettingsView: View {
 
     var body: some View {
         Form {
-            Section("Geral") {
-                Toggle("Mostrar o WhatsClean na barra de menus", isOn: $showMenuBarIcon)
+            Section("General") {
+                Toggle("Show WhatsClean in the menu bar", isOn: $showMenuBarIcon)
                     .onChange(of: showMenuBarIcon) { _ in
                         NotificationCenter.default.post(name: .menuBarPreferenceChanged, object: nil)
                     }
             }
 
-            Section("Atualizações") {
-                Toggle("Procurar atualizações automaticamente", isOn: Binding(
+            Section("Updates") {
+                Toggle("Automatically check for updates", isOn: Binding(
                     get: { updates.automaticallyChecksForUpdates },
                     set: { updates.automaticallyChecksForUpdates = $0 }
                 ))
-                Toggle("Baixar atualizações automaticamente", isOn: Binding(
+                Toggle("Automatically download updates", isOn: Binding(
                     get: { updates.automaticallyDownloadsUpdates },
                     set: { updates.automaticallyDownloadsUpdates = $0 }
                 ))
                 .disabled(!updates.automaticallyChecksForUpdates)
 
-                Button("Procurar atualização agora") {
+                Button("Check for Updates Now") {
                     updates.checkForUpdates()
                 }
             }
 
-            Text("As atualizações são verificadas e instaladas com segurança pelo Sparkle usando os lançamentos oficiais do WhatsClean no GitHub.")
+            Text("Updates are securely verified and installed by Sparkle using official WhatsClean releases on GitHub.")
                 .font(.caption)
                 .foregroundColor(.secondary)
                 .fixedSize(horizontal: false, vertical: true)
@@ -861,12 +861,12 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             item.button?.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "WhatsClean")
 
             let menu = NSMenu()
-            menu.addItem(withTitle: "Abrir WhatsClean", action: #selector(showMainWindow), keyEquivalent: "")
-            menu.addItem(withTitle: "Procurar atualizações…", action: #selector(checkForUpdates), keyEquivalent: "")
+            menu.addItem(withTitle: "Open WhatsClean", action: #selector(showMainWindow), keyEquivalent: "")
+            menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(withTitle: "Configurações…", action: #selector(showSettings), keyEquivalent: ",")
+            menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
             menu.addItem(NSMenuItem.separator())
-            let quitItem = menu.addItem(withTitle: "Sair", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            let quitItem = menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             for menuItem in menu.items where menuItem !== quitItem { menuItem.target = self }
             quitItem.target = NSApp
             item.menu = menu
@@ -903,7 +903,7 @@ struct WhatsCleanApp: App {
             let result = MediaScanner.scanSynchronously()
             scanner.items = result.items
             let deletion = scanner.deleteOlderThan7Days()
-            appLogger.info("Limpeza automática finalizada: \(deletion.deleted) movidos, \(deletion.failed) falhas")
+            appLogger.info("Automatic cleanup finished: \(deletion.deleted) moved, \(deletion.failed) failed")
             exit(deletion.failed == 0 ? 0 : 1)
         }
     }

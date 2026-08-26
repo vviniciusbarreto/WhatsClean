@@ -2,8 +2,8 @@
 set -euo pipefail
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
-VERSION="${1:?Uso: ./scripts/release.sh VERSAO NUMERO_DO_BUILD}"
-BUILD_NUMBER="${2:?Uso: ./scripts/release.sh VERSAO NUMERO_DO_BUILD}"
+VERSION="${1:?Usage: ./scripts/release.sh VERSION BUILD_NUMBER}"
+BUILD_NUMBER="${2:?Usage: ./scripts/release.sh VERSION BUILD_NUMBER}"
 ARCHIVE_NAME="WhatsClean-${VERSION}-arm64.zip"
 NOTES_NAME="WhatsClean-${VERSION}-arm64.md"
 RELEASE_DIR="$ROOT/Releases/$VERSION"
@@ -18,8 +18,8 @@ if [[ ! -f "$RELEASE_DIR/$NOTES_NAME" ]]; then
     printf '%s\n' \
         "# WhatsClean $VERSION" \
         "" \
-        "- Aplicativo nativo para Apple Silicon." \
-        "- Atualizações automáticas integradas com Sparkle." \
+        "- Native Apple Silicon application." \
+        "- Automatic updates powered by Sparkle." \
         > "$RELEASE_DIR/$NOTES_NAME"
 fi
 
@@ -34,7 +34,7 @@ mkdir -p "$PUBLIC_DIR"
 ditto "$RELEASE_DIR/$ARCHIVE_NAME" "$PUBLIC_DIR/$ARCHIVE_NAME"
 ditto "$ROOT/WhatsClean.dmg" "$PUBLIC_DIR/WhatsClean-${VERSION}-arm64.dmg"
 
-echo "Release preparada:"
+echo "Release prepared:"
 echo "  $PUBLIC_DIR/$ARCHIVE_NAME"
 echo "  $PUBLIC_DIR/WhatsClean-${VERSION}-arm64.dmg"
 echo "  $ROOT/appcast.xml"

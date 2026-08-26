@@ -225,5 +225,5 @@ if let img = createIconBitmap(pixels: 1024) {
         ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("Resources/AppIcon.png").path
     saveCGImageAsPNG(image: img, path: outputPath)
-    print("Ícone gerado em \(outputPath)")
+    print("Icon generated at \(outputPath)")
 }

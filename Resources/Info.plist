@@ -25,9 +25,9 @@
     <key>CFBundleVersion</key>
     <string>1.0.0</string>
     <key>CFBundleGetInfoString</key>
-    <string>WhatsClean v1.0.0, criado por Vinicius Barreto (@vviniciusbarreto).</string>
+    <string>WhatsClean v1.0.0, created by Vinicius Barreto (@vviniciusbarreto).</string>
     <key>NSHumanReadableCopyright</key>
-    <string>Criado por Vinicius Barreto (@vviniciusbarreto) • Copyright © 2026.&#10;Open Source under GPLv3 License.</string>
+    <string>Created by Vinicius Barreto (@vviniciusbarreto) • Copyright © 2026.&#10;Open source under the GPLv3 License.</string>
     <key>LSMinimumSystemVersion</key>
     <string>12.0</string>
     <key>NSHighResolutionCapable</key>

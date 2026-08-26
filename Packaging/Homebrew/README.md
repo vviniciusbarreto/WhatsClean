@@ -1,18 +1,18 @@
-# Homebrew Tap do WhatsClean
+# WhatsClean Homebrew Tap
 
-Este diretório é a origem do repositório público `vviniciusbarreto/homebrew-tap`.
+This directory contains the source for the public `vviniciusbarreto/homebrew-tap` repository.
 
-Instalação:
+Install:
 
 ```bash
 brew install --cask vviniciusbarreto/tap/whatsclean
 ```
 
-Atualização:
+Upgrade:
 
 ```bash
 brew update
 brew upgrade --cask whatsclean
 ```
 
-A cada release, atualize `version` e `sha256` em `Casks/whatsclean.rb`.
+Update `version` and `sha256` in `Casks/whatsclean.rb` for every release.

@@ -13,7 +13,7 @@ curl -fL "$URL" -o "$ARCHIVE"
 
 ACTUAL_SHA256="$(shasum -a 256 "$ARCHIVE" | awk '{print $1}')"
 if [[ "$ACTUAL_SHA256" != "$EXPECTED_SHA256" ]]; then
-    echo "Checksum inválido para o Sparkle $VERSION." >&2
+    echo "Invalid checksum for Sparkle $VERSION." >&2
     exit 1
 fi
 
@@ -24,4 +24,4 @@ tar -xJf "$ARCHIVE" -C "$DEST" \
     ./bin/sign_update \
     ./LICENSE
 
-echo "Sparkle $VERSION instalado e verificado em $DEST"
+echo "Sparkle $VERSION installed and verified at $DEST"

@@ -1,10 +1,10 @@
 cask "whatsclean" do
   version "1.0.0"
-  sha256 "d3032c64bea3c7e6d352a49fbc61cc0922b4e389fe70e222514f65150104e8fb"
+  sha256 "2af0cb3d8e7d23a03e73b10b77a97fe963318ef45b5ff29398d4cb14967ec5c3"
 
   url "https://github.com/vviniciusbarreto/WhatsClean/releases/download/v#{version}/WhatsClean-#{version}-arm64.zip"
   name "WhatsClean"
-  desc "Gerenciador e limpador de mídias do WhatsApp"
+  desc "Browse and clean media files stored by WhatsApp"
   homepage "https://github.com/vviniciusbarreto/WhatsClean"
 
   depends_on arch: :arm64
@@ -13,8 +13,8 @@ cask "whatsclean" do
   app "WhatsClean.app"
 
   caveats <<~EOS
-    Como o WhatsClean ainda não possui notarização Apple, o macOS pode pedir
-    autorização manual na primeira abertura. Tente abrir o app e use:
-    Ajustes do Sistema > Privacidade e Segurança > Abrir Mesmo Assim.
+    WhatsClean is not Apple-notarized, so macOS may require approval on first
+    launch. Try opening the app, then use System Settings > Privacy & Security >
+    Open Anyway.
   EOS
 end

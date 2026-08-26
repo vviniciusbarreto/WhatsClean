@@ -18,22 +18,22 @@ NOTARY_PROFILE="${NOTARY_PROFILE:-}"
 
 if [[ "$SIGNING_IDENTITY" != "-" ]] && \
    ! security find-identity -v -p codesigning | grep -Fq "$SIGNING_IDENTITY"; then
-    echo "Identidade de assinatura não encontrada: $SIGNING_IDENTITY" >&2
-    echo "Instale um certificado Developer ID Application ou rode sem APP_SIGNING_IDENTITY para um build local." >&2
+    echo "Code-signing identity not found: $SIGNING_IDENTITY" >&2
+    echo "Install a Developer ID Application certificate or omit APP_SIGNING_IDENTITY for a local build." >&2
     exit 1
 fi
 
 if [[ "$ARCH" != "arm64" ]]; then
-    echo "Arquitetura não suportada por este build: $ARCH" >&2
+    echo "Unsupported build architecture: $ARCH" >&2
     exit 1
 fi
 
 if [[ ! -d "$SPARKLE_FRAMEWORK" ]]; then
-    echo "Sparkle.framework não encontrado em $SPARKLE_FRAMEWORK" >&2
+    echo "Sparkle.framework was not found at $SPARKLE_FRAMEWORK" >&2
     exit 1
 fi
 
-echo "Compilando WhatsClean para Apple Silicon..."
+echo "Building WhatsClean for Apple Silicon..."
 mkdir -p "$BUILD_DIR"
 rm -rf "$APP"
 mkdir -p "$APP/Contents/MacOS" "$APP/Contents/Resources" "$APP/Contents/Frameworks"
@@ -50,6 +50,7 @@ chmod 755 "$APP/Contents/MacOS/WhatsClean"
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
+/usr/libexec/PlistBuddy -c "Set :CFBundleGetInfoString WhatsClean $VERSION, created by Vinicius Barreto (@vviniciusbarreto)." "$APP/Contents/Info.plist"
 
 ICONSET="$BUILD_DIR/AppIcon.iconset"
 rm -rf "$ICONSET"
@@ -74,7 +75,7 @@ sign_bundle() {
     fi
 }
 
-# Assinatura de dentro para fora, como exigido por bundles com código aninhado.
+# Sign nested code from the inside out.
 sign_bundle "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Downloader.xpc"
 sign_bundle "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/XPCServices/Installer.xpc"
 sign_bundle "$APP/Contents/Frameworks/Sparkle.framework/Versions/B/Updater.app"
@@ -84,7 +85,7 @@ if [[ "$SIGNING_IDENTITY" != "-" ]]; then
     codesign --force --sign "$SIGNING_IDENTITY" --options runtime --timestamp \
         --entitlements "$ROOT/Resources/WhatsClean.entitlements" "$APP"
 else
-    echo "Aviso: build local com assinatura ad-hoc; ele exige autorização manual do Gatekeeper na primeira abertura."
+    echo "Warning: this local ad-hoc build requires manual Gatekeeper approval on first launch."
     codesign --force --sign - --entitlements "$ROOT/Resources/WhatsClean.entitlements" "$APP"
 fi
 
@@ -95,25 +96,25 @@ rm -rf "$STAGE" "$DMG" "$ZIP"
 mkdir -p "$STAGE"
 ditto "$APP" "$STAGE/WhatsClean.app"
 ln -s /Applications "$STAGE/Applications"
-cp "$ROOT/Resources/COMO_ABRIR.txt" "$STAGE/LEIA PRIMEIRO - INSTALAÇÃO.txt"
+cp "$ROOT/Resources/INSTALL.txt" "$STAGE/README - INSTALLATION.txt"
 hdiutil create -volname "WhatsClean" -srcfolder "$STAGE" -ov -format UDZO "$DMG"
 
 if [[ "$SIGNING_IDENTITY" != "-" ]]; then
     codesign --force --sign "$SIGNING_IDENTITY" --timestamp "$DMG"
     if [[ -n "$NOTARY_PROFILE" ]]; then
-        echo "Enviando DMG para notarização da Apple..."
+        echo "Submitting DMG for Apple notarization..."
         xcrun notarytool submit "$DMG" --keychain-profile "$NOTARY_PROFILE" --wait
         xcrun stapler staple "$DMG"
         xcrun stapler validate "$DMG"
     else
-        echo "Aviso: NOTARY_PROFILE não definido; o DMG foi assinado, mas não notarizado."
+        echo "Warning: NOTARY_PROFILE is not set; the DMG is signed but not notarized."
     fi
 fi
 
 ditto -c -k --norsrc --keepParent "$APP" "$ZIP"
 
-echo "Artefatos gerados:"
+echo "Generated artifacts:"
 echo "  $APP"
 echo "  $DMG"
 echo "  $ZIP"
-echo "Arquitetura: $(lipo -archs "$APP/Contents/MacOS/WhatsClean")"
+echo "Architecture: $(lipo -archs "$APP/Contents/MacOS/WhatsClean")"
