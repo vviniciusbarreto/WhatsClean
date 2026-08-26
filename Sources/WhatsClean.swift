@@ -84,6 +84,10 @@ final class AutoCleanerManager: ObservableObject {
     @Published var isEnabled: Bool = false
     @Published var feedbackMessage: String?
 
+    private let preferenceKey = "autoCleanupEnabled"
+    private let registeredBuildKey = "autoCleanupRegisteredBuild"
+    private let launchAgentLabel = "com.vviniciusbarreto.whatsclean.autoclean"
+
     private let plistURL: URL = {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/com.vviniciusbarreto.whatsclean.autoclean.plist")
@@ -106,24 +110,52 @@ final class AutoCleanerManager: ObservableObject {
     }
 
     func checkStatus() {
-        self.isEnabled = FileManager.default.fileExists(atPath: plistURL.path)
+        let defaults = UserDefaults.standard
+        let plistExists = FileManager.default.fileExists(atPath: plistURL.path)
+        let storedPreference = defaults.object(forKey: preferenceKey) as? Bool
+        let jobLoaded = isJobLoaded()
+
+        // Migrate pre-1.0.3 installations from their existing plist/job, then
+        // preserve the user's intent independently of updater file replacement.
+        let shouldBeEnabled = storedPreference ?? (plistExists || jobLoaded)
+        guard shouldBeEnabled else {
+            isEnabled = false
+            return
+        }
+
+        defaults.set(true, forKey: preferenceKey)
+        let buildChanged = defaults.string(forKey: registeredBuildKey) != currentBuild
+        if !plistExists || !jobLoaded || buildChanged {
+            installSchedule(showFeedback: false)
+        } else {
+            isEnabled = true
+        }
     }
 
     func enable() {
+        installSchedule(showFeedback: true)
+    }
+
+    private func installSchedule(showFeedback: Bool) {
         let exe = executablePath
         let applications = ["/Applications/", FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path + "/"]
         guard applications.contains(where: { exe.hasPrefix($0) }) else {
-            feedbackMessage = "Install WhatsClean in the Applications folder before enabling automatic cleanup."
+            if showFeedback {
+                feedbackMessage = "Install WhatsClean in the Applications folder before enabling automatic cleanup."
+            }
             isEnabled = false
             return
         }
 
         let plist: [String: Any] = [
-            "Label": "com.vviniciusbarreto.whatsclean.autoclean",
+            "Label": launchAgentLabel,
             "ProgramArguments": [exe, "--clean-7days"],
             "StartInterval": 86400
         ]
         do {
+            if FileManager.default.fileExists(atPath: plistURL.path) || isJobLoaded() {
+                _ = runLaunchctl(["unload", plistURL.path])
+            }
             try FileManager.default.createDirectory(
                 at: plistURL.deletingLastPathComponent(),
                 withIntermediateDirectories: true
@@ -138,18 +170,34 @@ final class AutoCleanerManager: ObservableObject {
                 ])
             }
             isEnabled = true
-            feedbackMessage = "Daily automatic cleanup is enabled."
+            UserDefaults.standard.set(true, forKey: preferenceKey)
+            UserDefaults.standard.set(currentBuild, forKey: registeredBuildKey)
+            if showFeedback {
+                feedbackMessage = "Daily automatic cleanup is enabled."
+            }
         } catch {
             isEnabled = false
-            feedbackMessage = "Automatic cleanup could not be enabled: \(error.localizedDescription)"
+            if showFeedback {
+                feedbackMessage = "Automatic cleanup could not be enabled: \(error.localizedDescription)"
+            }
         }
     }
 
     func disable() {
         _ = runLaunchctl(["unload", plistURL.path])
         try? FileManager.default.removeItem(at: plistURL)
+        UserDefaults.standard.set(false, forKey: preferenceKey)
+        UserDefaults.standard.removeObject(forKey: registeredBuildKey)
         self.isEnabled = false
         feedbackMessage = "Automatic cleanup is disabled."
+    }
+
+    private var currentBuild: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+    }
+
+    private func isJobLoaded() -> Bool {
+        runLaunchctl(["print", "gui/\(getuid())/\(launchAgentLabel)"]) == 0
     }
 
     private func runLaunchctl(_ arguments: [String]) -> Int32 {

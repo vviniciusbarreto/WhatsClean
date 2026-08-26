@@ -68,7 +68,7 @@ The generated app, DMG, and ZIP are written to the project directory.
 ## Create a release
 
 ```bash
-./scripts/release.sh 1.0.2 3
+./scripts/release.sh 1.0.3 4
 ```
 
 The Sparkle private signing key remains in the macOS Keychain and must never be committed or shared.
