@@ -1007,6 +1007,12 @@ final class UpdateManager: ObservableObject {
             updaterDelegate: nil,
             userDriverDelegate: nil
         )
+
+        // Sparkle's automatic scheduler only checks after its configured interval.
+        // Also perform a silent launch check when the user has automatic checks enabled.
+        if controller.updater.automaticallyChecksForUpdates {
+            controller.updater.checkForUpdatesInBackground()
+        }
     }
 
     var automaticallyChecksForUpdates: Bool {

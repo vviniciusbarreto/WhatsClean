@@ -3,6 +3,25 @@
     <channel>
         <title>WhatsClean</title>
         <item>
+            <title>1.0.4</title>
+            <pubDate>Wed, 26 Aug 2026 16:36:47 -0300</pubDate>
+            <link>https://github.com/vviniciusbarreto/WhatsClean</link>
+            <sparkle:version>5</sparkle:version>
+            <sparkle:shortVersionString>1.0.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.0.4
+
+## Bug fix
+
+- Fixed automatic update checks not running immediately when WhatsClean was reopened.
+- When **Automatically check for updates** is enabled, WhatsClean now performs a silent update check at launch.
+- No “up to date” dialog is shown for automatic background checks; update alerts appear only when a new version is available.
+- Manual **Check for Updates Now** behavior remains unchanged.
+]]></description>
+            <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.0.4/WhatsClean-1.0.4-arm64.zip" length="2430999" type="application/octet-stream" sparkle:edSignature="PzPZvkmXfTB8MTDHOKqbxNKhqcf8COnzlUuslxdlFC6miTm1pi//URMOmooFQyOmChoQgxDtlJ08YLRbQUBlDg=="/>
+        </item>
+        <item>
             <title>1.0.3</title>
             <pubDate>Wed, 26 Aug 2026 16:19:42 -0300</pubDate>
             <link>https://github.com/vviniciusbarreto/WhatsClean</link>
@@ -46,27 +65,6 @@
 - Enlarged and centered the green phone symbol for better readability at every icon size.
 ]]></description>
             <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.0.2/WhatsClean-1.0.2-arm64.zip" length="2428848" type="application/octet-stream" sparkle:edSignature="0ufMWvBMhEa0tbrzD348vauyc/N0WAvLGjUD8Efwn6j8uoR+zLYk9bnhB0gBgMJYws5mHlpG3c0QRpB/hJVBBQ=="/>
-        </item>
-        <item>
-            <title>1.0.1</title>
-            <pubDate>Wed, 26 Aug 2026 00:29:03 -0300</pubDate>
-            <link>https://github.com/vviniciusbarreto/WhatsClean</link>
-            <sparkle:version>2</sparkle:version>
-            <sparkle:shortVersionString>1.0.1</sparkle:shortVersionString>
-            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
-            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
-            <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.0.1
-
-- Replaced repeated macOS app-data prompts with guided folder access.
-- Automatically opens the expected WhatsApp data location.
-- Remembers the selected folder across app launches.
-- Added a Change Folder option in Settings.
-- Added System, Light, and Dark appearance options.
-- Added an in-app Settings button and a dedicated settings window.
-- Added visible refresh progress and a last-updated timestamp.
-- Standardized the application interface language to English.
-]]></description>
-            <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.0.1/WhatsClean-1.0.1-arm64.zip" length="2324814" type="application/octet-stream" sparkle:edSignature="V3NlA6LgKUsdXKGtpD8iD3hp97hzPBnLIdwW+ucNfyxijxo/A6dA+1Crqciv4I8FJIECItr7oLUSJqIWviWxDg=="/>
         </item>
     </channel>
 </rss>

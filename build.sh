@@ -52,19 +52,9 @@ cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleGetInfoString WhatsClean $VERSION, created by Vinicius Barreto (@vviniciusbarreto)." "$APP/Contents/Info.plist"
 
-ICONSET="$BUILD_DIR/AppIcon.iconset"
-rm -rf "$ICONSET"
-mkdir -p "$ICONSET"
-for SPEC in "16 icon_16x16" "32 icon_16x16@2x" "32 icon_32x32" \
-            "64 icon_32x32@2x" "128 icon_128x128" "256 icon_128x128@2x" \
-            "256 icon_256x256" "512 icon_256x256@2x" "512 icon_512x512" \
-            "1024 icon_512x512@2x"; do
-    SIZE="${SPEC%% *}"
-    NAME="${SPEC#* }"
-    sips -z "$SIZE" "$SIZE" "$ROOT/Resources/AppIcon.png" \
-        --out "$ICONSET/$NAME.png" >/dev/null
-done
-iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
+# Keep a validated legacy ICNS fallback for macOS 12–15. Regenerating it with
+# iconutil can fail intermittently on newer macOS releases despite valid PNGs.
+ditto "$ROOT/Resources/AppIcon.icns" "$APP/Contents/Resources/AppIcon.icns"
 
 # Compile a modern asset catalog for macOS Tahoe while retaining AppIcon.icns
 # as the fallback for macOS 12–15.
