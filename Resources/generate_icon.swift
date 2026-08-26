@@ -2,11 +2,12 @@ import AppKit
 import CoreGraphics
 import Foundation
 
-func createIconBitmap(pixels: Int) -> CGImage? {
+func createIconBitmap(pixels: Int, modernCanvas: Bool = false) -> CGImage? {
     let width = pixels
     let height = pixels
     let colorSpace = CGColorSpaceCreateDeviceRGB()
-    let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+    let alphaInfo: CGImageAlphaInfo = modernCanvas ? .noneSkipLast : .premultipliedLast
+    let bitmapInfo = CGBitmapInfo(rawValue: alphaInfo.rawValue)
 
     guard let ctx = CGContext(
         data: nil,
@@ -28,18 +29,22 @@ func createIconBitmap(pixels: Int) -> CGImage? {
     let s = size / 1024.0
 
     // Squircle
-    let margin: CGFloat = 100.0 * s
+    // Keep only a narrow optical margin. A large transparent inset makes
+    // modern macOS releases place the legacy artwork inside a second tile.
+    let margin: CGFloat = (modernCanvas ? 0.0 : 28.0) * s
     let rectSize: CGFloat = size - (margin * 2.0)
-    let cornerRadius: CGFloat = 185.0 * s
+    let cornerRadius: CGFloat = (modernCanvas ? 0.0 : 220.0) * s
     let squircleRect = CGRect(x: margin, y: margin, width: rectSize, height: rectSize)
     let squirclePath = CGPath(roundedRect: squircleRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
 
-    ctx.saveGState()
-    ctx.setShadow(offset: CGSize(width: 0, height: -12.0 * s), blur: 24.0 * s, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.35))
-    ctx.addPath(squirclePath)
-    ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1.0))
-    ctx.fillPath()
-    ctx.restoreGState()
+    if !modernCanvas {
+        ctx.saveGState()
+        ctx.setShadow(offset: CGSize(width: 0, height: -12.0 * s), blur: 24.0 * s, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.35))
+        ctx.addPath(squirclePath)
+        ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1.0))
+        ctx.fillPath()
+        ctx.restoreGState()
+    }
 
     // Background Emerald Gradient
     ctx.saveGState()
@@ -64,11 +69,13 @@ func createIconBitmap(pixels: Int) -> CGImage? {
         ctx.drawRadialGradient(glowGradient, startCenter: CGPoint(x: size * 0.75, y: size * 0.75), startRadius: 0, endCenter: CGPoint(x: size * 0.75, y: size * 0.75), endRadius: size * 0.6, options: [])
     }
 
-    let innerBorder = CGPath(roundedRect: squircleRect.insetBy(dx: 2.0 * s, dy: 2.0 * s), cornerWidth: cornerRadius - 2.0 * s, cornerHeight: cornerRadius - 2.0 * s, transform: nil)
-    ctx.addPath(innerBorder)
-    ctx.setLineWidth(2.5 * s)
-    ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.35))
-    ctx.strokePath()
+    if !modernCanvas {
+        let innerBorder = CGPath(roundedRect: squircleRect.insetBy(dx: 2.0 * s, dy: 2.0 * s), cornerWidth: cornerRadius - 2.0 * s, cornerHeight: cornerRadius - 2.0 * s, transform: nil)
+        ctx.addPath(innerBorder)
+        ctx.setLineWidth(2.5 * s)
+        ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.35))
+        ctx.strokePath()
+    }
     ctx.restoreGState()
 
     // Central Chat Message Bubble
@@ -100,8 +107,8 @@ func createIconBitmap(pixels: Int) -> CGImage? {
     ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.8))
     ctx.strokePath()
 
-    let phoneSize = 110.0 * s
-    let phoneCenter = CGPoint(x: bubbleCenter.x - 30*s, y: bubbleCenter.y + 25*s)
+    let phoneSize = 250.0 * s
+    let phoneCenter = CGPoint(x: bubbleRect.midX, y: bubbleRect.midY)
     let phoneRect = CGRect(x: phoneCenter.x - phoneSize/2, y: phoneCenter.y - phoneSize/2, width: phoneSize, height: phoneSize)
     if let phoneImg = NSImage(systemSymbolName: "phone.fill", accessibilityDescription: nil) {
         let tinted = NSImage(size: NSSize(width: phoneSize, height: phoneSize))
@@ -125,7 +132,9 @@ func createIconBitmap(pixels: Int) -> CGImage? {
     ctx.setShadow(offset: CGSize(width: 6.0 * s, height: -12.0 * s), blur: 18.0 * s, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.38))
 
     let handleWidth = 24.0 * s
-    let handleHeight = 440.0 * s
+    // Let the handle break the green silhouette slightly, while keeping the
+    // important part inside the 1024 px canvas at every generated size.
+    let handleHeight = (modernCanvas ? 430.0 : 500.0) * s
     let handleRect = CGRect(x: -handleWidth/2, y: 10*s, width: handleWidth, height: handleHeight)
     let handlePath = CGPath(roundedRect: handleRect, cornerWidth: 12.0 * s, cornerHeight: 12.0 * s, transform: nil)
 
@@ -220,10 +229,19 @@ func saveCGImageAsPNG(image: CGImage, path: String) {
     CGImageDestinationFinalize(dest)
 }
 
-if let img = createIconBitmap(pixels: 1024) {
-    let outputPath = CommandLine.arguments.dropFirst().first
+let outputPath = CommandLine.arguments.dropFirst().first
         ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
             .appendingPathComponent("Resources/AppIcon.png").path
+let modernOutputPath = CommandLine.arguments.dropFirst(2).first
+        ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Resources/AppIconModern.png").path
+
+if let img = createIconBitmap(pixels: 1024) {
     saveCGImageAsPNG(image: img, path: outputPath)
     print("Icon generated at \(outputPath)")
+}
+
+if let modernImg = createIconBitmap(pixels: 1024, modernCanvas: true) {
+    saveCGImageAsPNG(image: modernImg, path: modernOutputPath)
+    print("Modern icon generated at \(modernOutputPath)")
 }

@@ -66,6 +66,30 @@ for SPEC in "16 icon_16x16" "32 icon_16x16@2x" "32 icon_32x32" \
 done
 iconutil -c icns "$ICONSET" -o "$APP/Contents/Resources/AppIcon.icns"
 
+# Compile a modern asset catalog for macOS Tahoe while retaining AppIcon.icns
+# as the fallback for macOS 12–15.
+ASSET_CATALOG="$BUILD_DIR/Assets.xcassets"
+rm -rf "$ASSET_CATALOG"
+ditto "$ROOT/Resources/Assets.xcassets" "$ASSET_CATALOG"
+MODERN_ICONSET="$ASSET_CATALOG/AppIcon.appiconset"
+for SPEC in "16 icon_16x16" "32 icon_16x16@2x" "32 icon_32x32" \
+            "64 icon_32x32@2x" "128 icon_128x128" "256 icon_128x128@2x" \
+            "256 icon_256x256" "512 icon_256x256@2x" "512 icon_512x512" \
+            "1024 icon_512x512@2x"; do
+    SIZE="${SPEC%% *}"
+    NAME="${SPEC#* }"
+    sips -z "$SIZE" "$SIZE" "$ROOT/Resources/AppIconModern.png" \
+        --out "$MODERN_ICONSET/$NAME.png" >/dev/null
+done
+xcrun actool "$ASSET_CATALOG" \
+    --compile "$APP/Contents/Resources" \
+    --platform macosx \
+    --minimum-deployment-target "$MIN_MACOS" \
+    --target-device mac \
+    --app-icon AppIcon \
+    --output-partial-info-plist "$BUILD_DIR/AppIcon-Info.plist" \
+    >/dev/null
+
 sign_bundle() {
     local target="$1"
     if [[ "$SIGNING_IDENTITY" != "-" ]]; then
