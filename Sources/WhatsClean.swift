@@ -15,6 +15,7 @@ enum MediaCategory: String, CaseIterable, Identifiable, Sendable {
     case audio = "Audio"
     case docs = "Documents"
     var id: String { self.rawValue }
+    var localizedName: String { NSLocalizedString(rawValue, comment: "Media category") }
     var icon: String {
         switch self {
         case .all: return "square.grid.2x2"
@@ -141,7 +142,7 @@ final class AutoCleanerManager: ObservableObject {
         let applications = ["/Applications/", FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path + "/"]
         guard applications.contains(where: { exe.hasPrefix($0) }) else {
             if showFeedback {
-                feedbackMessage = "Install WhatsClean in the Applications folder before enabling automatic cleanup."
+                feedbackMessage = NSLocalizedString("Install WhatsClean in the Applications folder before enabling automatic cleanup.", comment: "Auto cleanup error")
             }
             isEnabled = false
             return
@@ -173,12 +174,12 @@ final class AutoCleanerManager: ObservableObject {
             UserDefaults.standard.set(true, forKey: preferenceKey)
             UserDefaults.standard.set(currentBuild, forKey: registeredBuildKey)
             if showFeedback {
-                feedbackMessage = "Daily automatic cleanup is enabled."
+                feedbackMessage = NSLocalizedString("Daily automatic cleanup is enabled.", comment: "Auto cleanup enabled")
             }
         } catch {
             isEnabled = false
             if showFeedback {
-                feedbackMessage = "Automatic cleanup could not be enabled: \(error.localizedDescription)"
+                feedbackMessage = String(format: NSLocalizedString("Automatic cleanup could not be enabled: %@", comment: "Auto cleanup error"), error.localizedDescription)
             }
         }
     }
@@ -189,7 +190,7 @@ final class AutoCleanerManager: ObservableObject {
         UserDefaults.standard.set(false, forKey: preferenceKey)
         UserDefaults.standard.removeObject(forKey: registeredBuildKey)
         self.isEnabled = false
-        feedbackMessage = "Automatic cleanup is disabled."
+        feedbackMessage = NSLocalizedString("Automatic cleanup is disabled.", comment: "Auto cleanup disabled")
     }
 
     private var currentBuild: String {
@@ -595,9 +596,9 @@ class MediaScanner: ObservableObject {
         totalSizeString = bcf.string(fromByteCount: result.totalBytes)
         olderThan7DaysSizeString = bcf.string(fromByteCount: result.oldBytes)
         if result.rootsFound == 0 {
-            statusMessage = "Grant access to WhatsApp data to begin scanning."
+            statusMessage = NSLocalizedString("Grant access to WhatsApp data to begin scanning.", comment: "Scanner status")
         } else if result.inaccessibleRoots > 0 {
-            statusMessage = "WhatsApp access is no longer available. Open WhatsClean Settings and grant folder access again."
+            statusMessage = NSLocalizedString("WhatsApp access is no longer available. Open WhatsClean Settings and grant folder access again.", comment: "Scanner status")
         } else {
             statusMessage = nil
         }
@@ -649,7 +650,7 @@ struct ContentView: View {
                 HStack(spacing: 12) {
                 Picker("Category", selection: $selectedCategory) {
                     ForEach(MediaCategory.allCases) { cat in
-                        Label(cat.rawValue, systemImage: cat.icon).tag(cat)
+                        Label(cat.localizedName, systemImage: cat.icon).tag(cat)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -696,7 +697,7 @@ struct ContentView: View {
                 Button(action: { showDelete7DaysAlert = true }) {
                     HStack(spacing: 5) {
                         Image(systemName: "trash.circle")
-                        Text("Clean 7d+ (\(scanner.olderThan7DaysCount))")
+                        Text(String(format: NSLocalizedString("Clean 7d+ (%lld)", comment: "Cleanup button with file count"), Int64(scanner.olderThan7DaysCount)))
                             .lineLimit(1)
                     }
                 }
@@ -740,7 +741,7 @@ struct ContentView: View {
                         Text(item.name)
                             .lineLimit(1)
                             .font(.body.weight(.medium))
-                        Text(item.category.rawValue)
+                        Text(item.category.localizedName)
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
@@ -821,7 +822,7 @@ struct ContentView: View {
 
             VStack(spacing: 8) {
                 HStack {
-                Text("\(filteredItems.count) file(s) • Total: \(scanner.totalSizeString)")
+                Text(String(format: NSLocalizedString("%lld file(s) • Total: %@", comment: "File count and total size"), Int64(filteredItems.count), scanner.totalSizeString))
                     .font(.callout).foregroundColor(.secondary)
                 Spacer()
                 if scanner.isScanning {
@@ -829,7 +830,7 @@ struct ContentView: View {
                         .font(.caption)
                         .foregroundColor(.secondary)
                 } else if let lastRefreshedAt = scanner.lastRefreshedAt {
-                    Text("Updated \(lastRefreshedAt, style: .time)")
+                    Text(String(format: NSLocalizedString("Updated %@", comment: "Last refresh time"), DateFormatter.localizedString(from: lastRefreshedAt, dateStyle: .none, timeStyle: .short)))
                         .font(.caption)
                         .foregroundColor(.secondary)
                 }
@@ -877,13 +878,13 @@ struct ContentView: View {
             }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("Found \(scanner.olderThan7DaysCount) file(s) older than seven days (\(scanner.olderThan7DaysSizeString)). They will be moved to the Trash to free up space.")
+            Text(String(format: NSLocalizedString("Found %lld file(s) older than seven days (%@). They will be moved to the Trash to free up space.", comment: "Old media cleanup confirmation"), Int64(scanner.olderThan7DaysCount), scanner.olderThan7DaysSizeString))
         }
         .alert("Move selected files to the Trash?", isPresented: $showDeleteSelectedAlert) {
             Button("Move to Trash", role: .destructive) { deleteSelected() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text("The \(selectedItems.count) selected file(s) will be moved to the Trash.")
+            Text(String(format: NSLocalizedString("The %lld selected file(s) will be moved to the Trash.", comment: "Selected files cleanup confirmation"), Int64(selectedItems.count)))
         }
         .alert("Operation Result", isPresented: Binding(
             get: { operationMessage != nil },
@@ -954,7 +955,7 @@ struct ContentView: View {
             do {
                 try FileManager.default.copyItem(at: u, to: dest)
             } catch {
-                operationMessage = "Could not save \(u.lastPathComponent): \(error.localizedDescription)"
+                operationMessage = String(format: NSLocalizedString("Could not save %@: %@", comment: "Save error"), u.lastPathComponent, error.localizedDescription)
             }
         }
     }
@@ -990,8 +991,10 @@ struct ContentView: View {
     }
 
     private func deletionMessage(deleted: Int, failed: Int) -> String {
-        if failed == 0 { return "\(deleted) file(s) moved to the Trash." }
-        return "\(deleted) file(s) moved to the Trash; \(failed) could not be moved. Check macOS permissions."
+        if failed == 0 {
+            return String(format: NSLocalizedString("%lld file(s) moved to the Trash.", comment: "Deletion result"), Int64(deleted))
+        }
+        return String(format: NSLocalizedString("%lld file(s) moved to the Trash; %lld could not be moved. Check macOS permissions.", comment: "Deletion result"), Int64(deleted), Int64(failed))
     }
 }
 
@@ -1042,6 +1045,7 @@ enum AppAppearance: String, CaseIterable, Identifiable {
     case dark = "Dark"
 
     var id: String { rawValue }
+    var localizedName: String { NSLocalizedString(rawValue, comment: "Appearance option") }
 
     var colorScheme: ColorScheme? {
         switch self {
@@ -1079,7 +1083,7 @@ struct WhatsCleanSettingsView: View {
             Section("General") {
                 Picker("Appearance", selection: $appAppearance) {
                     ForEach(AppAppearance.allCases) { appearance in
-                        Text(appearance.rawValue).tag(appearance.rawValue)
+                        Text(appearance.localizedName).tag(appearance.rawValue)
                     }
                 }
                 .pickerStyle(.segmented)
@@ -1106,6 +1110,17 @@ struct WhatsCleanSettingsView: View {
                 }
             }
 
+            Section("Help") {
+                HStack {
+                    Button("Getting Started…") {
+                        OnboardingWindowController.shared.show()
+                    }
+                    Button("About WhatsClean…") {
+                        AboutWindowController.shared.show()
+                    }
+                }
+            }
+
             Text("Updates are securely verified and installed by Sparkle using official WhatsClean releases on GitHub.")
                 .font(.caption)
                 .foregroundColor(.secondary)
@@ -1117,6 +1132,168 @@ struct WhatsCleanSettingsView: View {
     }
 }
 
+struct OnboardingView: View {
+    let completion: () -> Void
+
+    var body: some View {
+        VStack(spacing: 22) {
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 92, height: 92)
+
+            VStack(spacing: 6) {
+                Text("Welcome to WhatsClean")
+                    .font(.largeTitle.bold())
+                Text("A simple, private way to review and clean WhatsApp media on your Mac.")
+                    .font(.title3)
+                    .foregroundColor(.secondary)
+                    .multilineTextAlignment(.center)
+            }
+
+            VStack(alignment: .leading, spacing: 16) {
+                onboardingRow(
+                    icon: "hand.tap",
+                    title: "Open it only when you need it",
+                    detail: "Review your WhatsApp images, videos, audio, and documents, move what you no longer need to the Trash, and close the app. WhatsClean does not need to stay open."
+                )
+                onboardingRow(
+                    icon: "bolt.shield",
+                    title: "Optional automatic cleanup",
+                    detail: "Enable Auto (7d) once to move WhatsApp media older than seven days to the Trash every day. macOS runs the task briefly; WhatsClean does not remain in the background consuming RAM or CPU."
+                )
+                onboardingRow(
+                    icon: "lock.shield",
+                    title: "Private and under your control",
+                    detail: "Files are processed locally on your Mac. Deleted items go to the Trash, and automatic cleanup can be disabled at any time."
+                )
+            }
+            .frame(maxWidth: 620)
+
+            HStack {
+                Button("About WhatsClean…") {
+                    AboutWindowController.shared.show()
+                }
+                Spacer()
+                Button("Get Started") { completion() }
+                    .keyboardShortcut(.defaultAction)
+                    .buttonStyle(.borderedProminent)
+            }
+        }
+        .padding(30)
+        .frame(minWidth: 560, idealWidth: 680, minHeight: 480)
+    }
+
+    private func onboardingRow(icon: String, title: LocalizedStringKey, detail: LocalizedStringKey) -> some View {
+        HStack(alignment: .top, spacing: 14) {
+            Image(systemName: icon)
+                .font(.title2)
+                .foregroundColor(.accentColor)
+                .frame(width: 30)
+            VStack(alignment: .leading, spacing: 3) {
+                Text(title).font(.headline)
+                Text(detail)
+                    .foregroundColor(.secondary)
+                    .fixedSize(horizontal: false, vertical: true)
+            }
+        }
+    }
+}
+
+struct AboutWhatsCleanView: View {
+    private var version: String {
+        Bundle.main.object(forInfoDictionaryKey: "CFBundleShortVersionString") as? String ?? ""
+    }
+
+    var body: some View {
+        VStack(spacing: 16) {
+            Image(nsImage: NSApplication.shared.applicationIconImage)
+                .resizable()
+                .scaledToFit()
+                .frame(width: 104, height: 104)
+            VStack(spacing: 4) {
+                Text("WhatsClean").font(.largeTitle.bold())
+                Text(String(format: NSLocalizedString("Version %@", comment: "App version"), version)).foregroundColor(.secondary)
+            }
+            Text("Clean WhatsApp media on macOS without keeping another app running in the background.")
+                .font(.title3)
+                .multilineTextAlignment(.center)
+                .frame(maxWidth: 460)
+            Text("Use WhatsClean when you need it and close it when you are done. If Auto (7d) is enabled, macOS briefly runs a scheduled cleanup once a day and moves WhatsApp media older than seven days to the Trash—without WhatsClean continuously using RAM or CPU.")
+                .foregroundColor(.secondary)
+                .multilineTextAlignment(.center)
+                .fixedSize(horizontal: false, vertical: true)
+                .frame(maxWidth: 500)
+            HStack(spacing: 16) {
+                Link("Project on GitHub", destination: URL(string: "https://github.com/vviniciusbarreto/WhatsClean")!)
+                Link("GPLv3 License", destination: URL(string: "https://github.com/vviniciusbarreto/WhatsClean/blob/main/LICENSE")!)
+            }
+            Text("Created by Vinicius Barreto • Open source and privacy-friendly")
+                .font(.caption)
+                .foregroundColor(.secondary)
+        }
+        .padding(30)
+        .frame(minWidth: 520, idealWidth: 580, minHeight: 490)
+    }
+}
+
+@MainActor
+final class OnboardingWindowController: NSWindowController, NSWindowDelegate {
+    static let shared = OnboardingWindowController()
+
+    private init() {
+        let window = NSWindow()
+        super.init(window: window)
+        window.contentViewController = NSHostingController(rootView: OnboardingView {
+            UserDefaults.standard.set(true, forKey: "hasCompletedOnboardingV1")
+            NSApp.keyWindow?.close()
+        })
+        window.title = NSLocalizedString("Getting Started", comment: "Onboarding window title")
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.isReleasedWhenClosed = false
+        window.delegate = self
+        window.setContentSize(NSSize(width: 680, height: 560))
+        window.minSize = NSSize(width: 560, height: 480)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func show() {
+        NSApp.activate(ignoringOtherApps: true)
+        window?.center()
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+    }
+
+    func windowWillClose(_ notification: Notification) {
+        UserDefaults.standard.set(true, forKey: "hasCompletedOnboardingV1")
+    }
+}
+
+@MainActor
+final class AboutWindowController: NSWindowController {
+    static let shared = AboutWindowController()
+
+    private init() {
+        let window = NSWindow(contentViewController: NSHostingController(rootView: AboutWhatsCleanView()))
+        window.title = NSLocalizedString("About WhatsClean", comment: "About window title")
+        window.styleMask = [.titled, .closable, .miniaturizable, .resizable]
+        window.isReleasedWhenClosed = false
+        window.setContentSize(NSSize(width: 580, height: 520))
+        window.minSize = NSSize(width: 520, height: 490)
+        super.init(window: window)
+    }
+
+    required init?(coder: NSCoder) { fatalError("init(coder:) has not been implemented") }
+
+    func show() {
+        NSApp.activate(ignoringOtherApps: true)
+        window?.center()
+        showWindow(nil)
+        window?.makeKeyAndOrderFront(nil)
+    }
+}
+
 @MainActor
 final class SettingsWindowController: NSWindowController {
     static let shared = SettingsWindowController()
@@ -1124,7 +1301,7 @@ final class SettingsWindowController: NSWindowController {
     private init() {
         let hostingController = NSHostingController(rootView: WhatsCleanSettingsView())
         let window = NSWindow(contentViewController: hostingController)
-        window.title = "WhatsClean Settings"
+        window.title = NSLocalizedString("WhatsClean Settings", comment: "Settings window title")
         window.styleMask = [.titled, .closable, .miniaturizable]
         window.isReleasedWhenClosed = false
         window.setContentSize(NSSize(width: 480, height: 460))
@@ -1167,6 +1344,11 @@ class AppDelegate: NSObject, NSApplicationDelegate {
         updateMenuBarItem()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
+        if !UserDefaults.standard.bool(forKey: "hasCompletedOnboardingV1") {
+            DispatchQueue.main.async {
+                OnboardingWindowController.shared.show()
+            }
+        }
     }
 
     func applicationWillTerminate(_ notification: Notification) {
@@ -1182,12 +1364,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
             item.button?.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "WhatsClean")
 
             let menu = NSMenu()
-            menu.addItem(withTitle: "Open WhatsClean", action: #selector(showMainWindow), keyEquivalent: "")
-            menu.addItem(withTitle: "Check for Updates…", action: #selector(checkForUpdates), keyEquivalent: "")
+            menu.addItem(withTitle: NSLocalizedString("Open WhatsClean", comment: "Menu bar item"), action: #selector(showMainWindow), keyEquivalent: "")
+            menu.addItem(withTitle: NSLocalizedString("Check for Updates…", comment: "Menu bar item"), action: #selector(checkForUpdates), keyEquivalent: "")
             menu.addItem(NSMenuItem.separator())
-            menu.addItem(withTitle: "Settings…", action: #selector(showSettings), keyEquivalent: ",")
+            menu.addItem(withTitle: NSLocalizedString("Getting Started…", comment: "Menu bar item"), action: #selector(showOnboarding), keyEquivalent: "")
+            menu.addItem(withTitle: NSLocalizedString("About WhatsClean…", comment: "Menu bar item"), action: #selector(showAbout), keyEquivalent: "")
+            menu.addItem(withTitle: NSLocalizedString("Settings…", comment: "Menu bar item"), action: #selector(showSettings), keyEquivalent: ",")
             menu.addItem(NSMenuItem.separator())
-            let quitItem = menu.addItem(withTitle: "Quit", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            let quitItem = menu.addItem(withTitle: NSLocalizedString("Quit", comment: "Menu bar item"), action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
             for menuItem in menu.items where menuItem !== quitItem { menuItem.target = self }
             quitItem.target = NSApp
             item.menu = menu
@@ -1209,6 +1393,14 @@ class AppDelegate: NSObject, NSApplicationDelegate {
 
     @objc private func showSettings() {
         SettingsWindowController.shared.show()
+    }
+
+    @objc private func showOnboarding() {
+        OnboardingWindowController.shared.show()
+    }
+
+    @objc private func showAbout() {
+        AboutWindowController.shared.show()
     }
 }
 
@@ -1235,11 +1427,21 @@ struct WhatsCleanApp: App {
                 .preferredColorScheme(AppAppearance(rawValue: appAppearance)?.colorScheme)
         }
         .commands {
+            CommandGroup(replacing: .appInfo) {
+                Button("About WhatsClean") {
+                    AboutWindowController.shared.show()
+                }
+            }
             CommandGroup(replacing: .appSettings) {
                 Button("Settings…") {
                     SettingsWindowController.shared.show()
                 }
                 .keyboardShortcut(",", modifiers: .command)
+            }
+            CommandGroup(after: .help) {
+                Button("Getting Started…") {
+                    OnboardingWindowController.shared.show()
+                }
             }
         }
     }

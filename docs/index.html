@@ -1,0 +1,41 @@
+<!doctype html>
+<html lang="en">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width,initial-scale=1">
+  <title>WhatsClean — WhatsApp storage cleaner for macOS</title>
+  <meta name="description" content="Free, private WhatsApp media and storage cleaner for Apple Silicon Macs. Review files, move unwanted media to the Trash, or schedule lightweight cleanup of media older than seven days.">
+  <meta property="og:title" content="WhatsClean — WhatsApp storage cleaner for macOS">
+  <meta property="og:description" content="Clean WhatsApp images, videos, audio, and documents locally on your Mac. No permanent background process.">
+  <meta property="og:type" content="website">
+  <meta property="og:url" content="https://vviniciusbarreto.github.io/WhatsClean/">
+  <link rel="canonical" href="https://vviniciusbarreto.github.io/WhatsClean/">
+  <style>
+    :root{color-scheme:light dark;--accent:#08b978;--bg:#f6f8fa;--card:#fff;--text:#17211d;--muted:#5d6b65}
+    @media(prefers-color-scheme:dark){:root{--bg:#101412;--card:#19201d;--text:#f0f6f3;--muted:#aab8b1}}
+    *{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--text);font:17px/1.6 -apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif}
+    main{max-width:900px;margin:auto;padding:72px 24px}.hero{text-align:center}.icon{width:128px;height:128px;border-radius:28px}
+    h1{font-size:clamp(42px,8vw,72px);line-height:1;margin:20px 0 14px}h2{margin-top:48px}p{color:var(--muted)}
+    .lead{font-size:22px;max-width:720px;margin:0 auto}.actions{display:flex;gap:12px;justify-content:center;flex-wrap:wrap;margin:30px 0}
+    a.button{padding:11px 18px;border-radius:10px;background:var(--accent);color:white;text-decoration:none;font-weight:650}.secondary{background:transparent!important;color:var(--accent)!important;border:1px solid var(--accent)}
+    .grid{display:grid;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));gap:16px;margin-top:30px}.card{background:var(--card);padding:22px;border-radius:16px}.card h3{margin-top:0}
+    code{background:var(--card);padding:4px 7px;border-radius:6px}footer{margin-top:60px;text-align:center;font-size:14px}
+  </style>
+  <script type="application/ld+json">{"@context":"https://schema.org","@type":"SoftwareApplication","name":"WhatsClean","applicationCategory":"UtilitiesApplication","operatingSystem":"macOS 12 or later on Apple Silicon","isAccessibleForFree":true,"license":"https://www.gnu.org/licenses/gpl-3.0.html","downloadUrl":"https://github.com/vviniciusbarreto/WhatsClean/releases/latest","description":"A free, private WhatsApp media and storage cleaner for macOS."}</script>
+</head>
+<body><main>
+  <section class="hero">
+    <img class="icon" src="https://raw.githubusercontent.com/vviniciusbarreto/WhatsClean/main/Resources/AppIconModern.png" alt="WhatsClean app icon">
+    <h1>WhatsClean</h1>
+    <p class="lead">A free, private WhatsApp storage cleaner for macOS. Review and remove unwanted images, videos, audio, and documents without keeping another app running in the background.</p>
+    <div class="actions"><a class="button" href="https://github.com/vviniciusbarreto/WhatsClean/releases/latest">Download for Apple Silicon</a><a class="button secondary" href="https://github.com/vviniciusbarreto/WhatsClean">View on GitHub</a></div>
+  </section>
+  <section class="grid">
+    <article class="card"><h3>Use it and close it</h3><p>Open WhatsClean when you need it, clean your WhatsApp storage, and quit. It does not need to stay open.</p></article>
+    <article class="card"><h3>Lightweight Auto (7d)</h3><p>Optionally let macOS run a brief daily task that moves WhatsApp media older than seven days to the Trash—without continuous RAM or CPU use.</p></article>
+    <article class="card"><h3>Private by design</h3><p>Your files are scanned locally and unwanted items are moved to the Trash. WhatsClean does not upload your media.</p></article>
+  </section>
+  <h2>Install with Homebrew</h2><p><code>brew install --cask vviniciusbarreto/tap/whatsclean</code></p>
+  <h2>Simple and reversible</h2><p>Preview media before cleaning, save anything you want to keep, and recover recently removed files from the macOS Trash. Available in English and Brazilian Portuguese.</p>
+  <footer><p>Open source under GPLv3 · Created by Vinicius Barreto · WhatsApp is a trademark of its respective owner; WhatsClean is an independent project.</p></footer>
+</main></body></html>

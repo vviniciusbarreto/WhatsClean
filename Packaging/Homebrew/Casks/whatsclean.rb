@@ -1,11 +1,11 @@
 cask "whatsclean" do
-  version "1.0.4"
-  sha256 "01ce665339ff06e65a692c5f4bbdf6a31ec4f867efa79344413ffd880cc07896"
+  version "1.1.0"
+  sha256 "dfe4afce95c8b5b8afed01b0c2e931a7e28c4056d2e25bd3bd3dce4ad7a4c71f"
 
   url "https://github.com/vviniciusbarreto/WhatsClean/releases/download/v#{version}/WhatsClean-#{version}-arm64.zip"
   name "WhatsClean"
-  desc "Browse and clean media files stored by WhatsApp"
-  homepage "https://github.com/vviniciusbarreto/WhatsClean"
+  desc "Private WhatsApp media and storage cleaner"
+  homepage "https://vviniciusbarreto.github.io/WhatsClean/"
 
   depends_on arch: :arm64
   depends_on macos: :monterey

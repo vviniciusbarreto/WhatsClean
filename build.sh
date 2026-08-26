@@ -48,6 +48,10 @@ xcrun swiftc -parse-as-library -O -sdk "$SDK" \
 chmod 755 "$APP/Contents/MacOS/WhatsClean"
 
 cp "$ROOT/Resources/Info.plist" "$APP/Contents/Info.plist"
+for LOCALIZATION in "$ROOT/Resources"/*.lproj; do
+    [[ -d "$LOCALIZATION" ]] || continue
+    ditto "$LOCALIZATION" "$APP/Contents/Resources/$(basename "$LOCALIZATION")"
+done
 /usr/libexec/PlistBuddy -c "Set :CFBundleShortVersionString $VERSION" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleVersion $BUILD_NUMBER" "$APP/Contents/Info.plist"
 /usr/libexec/PlistBuddy -c "Set :CFBundleGetInfoString WhatsClean $VERSION, created by Vinicius Barreto (@vviniciusbarreto)." "$APP/Contents/Info.plist"

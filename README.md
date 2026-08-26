@@ -1,6 +1,6 @@
 # WhatsClean
 
-WhatsClean is a native macOS utility for finding and cleaning media files stored by WhatsApp.
+WhatsClean is a free, open-source WhatsApp storage cleaner for macOS. Review images, videos, audio, and documents stored by WhatsApp, then safely move unwanted media to the Trash.
 
 Built for Apple Silicon and macOS 12 or later.
 
@@ -14,6 +14,15 @@ Built for Apple Silicon and macOS 12 or later.
 - Show or hide the optional menu bar icon.
 - Use the system appearance or choose Light or Dark mode.
 - Grant persistent access to the detected WhatsApp folder with one guided click.
+- Follow a localized first-launch guide in English or Brazilian Portuguese.
+
+## How it works
+
+WhatsClean does not need to remain open or continuously run in the background. Open it when you want to review WhatsApp storage, clean what you no longer need, and close it when you are done.
+
+**Auto (7d)** is optional. When enabled, macOS briefly launches a scheduled task once a day to move WhatsApp media older than seven days to the Trash. The app does not remain active or continuously consume RAM or CPU.
+
+All file scanning and cleanup happen locally on your Mac. WhatsClean does not upload your media.
 
 ## Install
 
@@ -68,7 +77,7 @@ The generated app, DMG, and ZIP are written to the project directory.
 ## Create a release
 
 ```bash
-./scripts/release.sh 1.0.4 5
+./scripts/release.sh 1.1.0 6
 ```
 
 The Sparkle private signing key remains in the macOS Keychain and must never be committed or shared.
