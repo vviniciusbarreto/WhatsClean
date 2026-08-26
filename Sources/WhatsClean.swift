@@ -2,8 +2,13 @@ import SwiftUI
 import AppKit
 import Quartz
 import AVFoundation
+import ImageIO
+import os.log
+import Sparkle
 
-enum MediaCategory: String, CaseIterable, Identifiable {
+private let appLogger = Logger(subsystem: "com.vviniciusbarreto.whatsclean", category: "lifecycle")
+
+enum MediaCategory: String, CaseIterable, Identifiable, Sendable {
     case all = "Todos"
     case images = "Imagens"
     case videos = "Vídeos"
@@ -21,7 +26,7 @@ enum MediaCategory: String, CaseIterable, Identifiable {
     }
 }
 
-struct MediaItem: Identifiable, Hashable {
+struct MediaItem: Identifiable, Hashable, Sendable {
     let id: String
     let url: URL
     let name: String
@@ -29,20 +34,20 @@ struct MediaItem: Identifiable, Hashable {
     let ext: String
     let size: Int64
     let date: Date
-    
+
     var sizeFormatted: String {
         let bcf = ByteCountFormatter()
         bcf.allowedUnits = [.useAll]
         bcf.countStyle = .file
         return bcf.string(fromByteCount: size)
     }
-    
+
     var dateFormatted: String {
         let df = DateFormatter()
         df.dateFormat = "dd/MM/yyyy HH:mm:ss"
         return df.string(from: date)
     }
-    
+
     var isOlderThan7Days: Bool {
         return date < Date().addingTimeInterval(-7 * 86400)
     }
@@ -51,7 +56,7 @@ struct MediaItem: Identifiable, Hashable {
 final class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanelDelegate {
     static let shared = QuickLookManager()
     var currentURL: URL?
-    
+
     func preview(url: URL) {
         self.currentURL = url
         DispatchQueue.main.async {
@@ -65,11 +70,11 @@ final class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
             }
         }
     }
-    
+
     func numberOfPreviewItems(in panel: QLPreviewPanel!) -> Int {
         return currentURL != nil ? 1 : 0
     }
-    
+
     func previewPanel(_ panel: QLPreviewPanel!, previewItemAt index: Int) -> QLPreviewItem! {
         return (currentURL as NSURL?) ?? NSURL()
     }
@@ -77,12 +82,13 @@ final class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
 
 final class AutoCleanerManager: ObservableObject {
     @Published var isEnabled: Bool = false
-    
+    @Published var feedbackMessage: String?
+
     private let plistURL: URL = {
         FileManager.default.homeDirectoryForCurrentUser
             .appendingPathComponent("Library/LaunchAgents/com.vviniciusbarreto.whatsclean.autoclean.plist")
     }()
-    
+
     private var executablePath: String {
         let candidates = [
             "/Applications/WhatsClean.app/Contents/MacOS/WhatsClean",
@@ -94,45 +100,87 @@ final class AutoCleanerManager: ObservableObject {
         }
         return candidates[0]
     }
-    
+
     init() {
         checkStatus()
     }
-    
+
     func checkStatus() {
         self.isEnabled = FileManager.default.fileExists(atPath: plistURL.path)
     }
-    
-    func toggle() {
-        if isEnabled {
-            disable()
-        } else {
-            enable()
-        }
-    }
-    
+
     func enable() {
         let exe = executablePath
-        let plistContent = "<?xml version=\"1.0\" encoding=\"UTF-8\"?>\n<!DOCTYPE plist PUBLIC \"-//Apple//DTD PLIST 1.0//EN\" \"http://www.apple.com/DTDs/PropertyList-1.0.dtd\">\n<plist version=\"1.0\">\n<dict>\n<key>Label</key>\n<string>com.vviniciusbarreto.whatsclean.autoclean</string>\n<key>ProgramArguments</key>\n<array>\n<string>\(exe)</string>\n<string>--clean-7days</string>\n</array>\n<key>StartInterval</key>\n<integer>86400</integer>\n<key>RunAtLoad</key>\n<true/>\n</dict>\n</plist>"
-        try? plistContent.write(to: plistURL, atomically: true, encoding: .utf8)
-        Process.launchedProcess(launchPath: "/bin/launchctl", arguments: ["load", "-w", plistURL.path])
-        if FileManager.default.fileExists(atPath: exe) {
-            Process.launchedProcess(launchPath: exe, arguments: ["--clean-7days"])
+        let applications = ["/Applications/", FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path + "/"]
+        guard applications.contains(where: { exe.hasPrefix($0) }) else {
+            feedbackMessage = "Instale o WhatsClean na pasta Aplicativos antes de ativar a limpeza automática."
+            isEnabled = false
+            return
         }
-        self.isEnabled = true
+
+        let plist: [String: Any] = [
+            "Label": "com.vviniciusbarreto.whatsclean.autoclean",
+            "ProgramArguments": [exe, "--clean-7days"],
+            "StartInterval": 86400
+        ]
+        do {
+            try FileManager.default.createDirectory(
+                at: plistURL.deletingLastPathComponent(),
+                withIntermediateDirectories: true
+            )
+            let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
+            try data.write(to: plistURL, options: .atomic)
+            let status = runLaunchctl(["load", "-w", plistURL.path])
+            guard status == 0 else {
+                try? FileManager.default.removeItem(at: plistURL)
+                throw NSError(domain: "WhatsClean", code: Int(status), userInfo: [
+                    NSLocalizedDescriptionKey: "O macOS recusou o agendamento da limpeza automática."
+                ])
+            }
+            isEnabled = true
+            feedbackMessage = "A limpeza automática diária foi ativada."
+        } catch {
+            isEnabled = false
+            feedbackMessage = "Não foi possível ativar a limpeza automática: \(error.localizedDescription)"
+        }
     }
-    
+
     func disable() {
-        Process.launchedProcess(launchPath: "/bin/launchctl", arguments: ["unload", plistURL.path])
+        _ = runLaunchctl(["unload", plistURL.path])
         try? FileManager.default.removeItem(at: plistURL)
         self.isEnabled = false
+        feedbackMessage = "A limpeza automática foi desativada."
     }
+
+    private func runLaunchctl(_ arguments: [String]) -> Int32 {
+        let process = Process()
+        process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
+        process.arguments = arguments
+        process.standardOutput = FileHandle.nullDevice
+        process.standardError = FileHandle.nullDevice
+        do {
+            try process.run()
+            process.waitUntilExit()
+            return process.terminationStatus
+        } catch {
+            return -1
+        }
+    }
+}
+
+final class ThumbnailCache {
+    static let shared: NSCache<NSString, NSImage> = {
+        let cache = NSCache<NSString, NSImage>()
+        cache.countLimit = 500
+        cache.totalCostLimit = 64 * 1024 * 1024
+        return cache
+    }()
 }
 
 struct AsyncThumbnailView: View {
     let item: MediaItem
     @State private var thumbnail: NSImage? = nil
-    
+
     var body: some View {
         Group {
             if let img = thumbnail {
@@ -153,11 +201,11 @@ struct AsyncThumbnailView: View {
                 .frame(width: 36, height: 36)
             }
         }
-        .task {
+        .onAppear {
             loadThumbnail()
         }
     }
-    
+
     private var categoryColor: Color {
         switch item.category {
         case .images: return .blue
@@ -167,23 +215,41 @@ struct AsyncThumbnailView: View {
         default: return .gray
         }
     }
-    
+
     private func loadThumbnail() {
+        let key = item.id as NSString
+        if let cached = ThumbnailCache.shared.object(forKey: key) {
+            self.thumbnail = cached
+            return
+        }
+
         let url = item.url
         if item.category == .images || item.ext == "JPG" || item.ext == "PNG" || item.ext == "GIF" {
-            DispatchQueue.global(qos: .userInitiated).async {
-                if let img = NSImage(contentsOf: url) {
+            DispatchQueue.global(qos: .utility).async {
+                let sourceOptions = [kCGImageSourceShouldCache: false] as CFDictionary
+                let thumbnailOptions = [
+                    kCGImageSourceCreateThumbnailFromImageAlways: true,
+                    kCGImageSourceCreateThumbnailWithTransform: true,
+                    kCGImageSourceThumbnailMaxPixelSize: 72,
+                    kCGImageSourceShouldCacheImmediately: true
+                ] as CFDictionary
+                if let source = CGImageSourceCreateWithURL(url as CFURL, sourceOptions),
+                   let cgImage = CGImageSourceCreateThumbnailAtIndex(source, 0, thumbnailOptions) {
+                    let img = NSImage(cgImage: cgImage, size: NSSize(width: 36, height: 36))
+                    ThumbnailCache.shared.setObject(img, forKey: key, cost: cgImage.bytesPerRow * cgImage.height)
                     DispatchQueue.main.async { self.thumbnail = img }
                 }
             }
         } else if item.category == .videos {
-            DispatchQueue.global(qos: .userInitiated).async {
+            DispatchQueue.global(qos: .utility).async {
                 let asset = AVURLAsset(url: url)
                 let gen = AVAssetImageGenerator(asset: asset)
                 gen.appliesPreferredTrackTransform = true
+                gen.maximumSize = CGSize(width: 72, height: 72)
                 let time = CMTime(seconds: 0.5, preferredTimescale: 60)
                 if let cgImage = try? gen.copyCGImage(at: time, actualTime: nil) {
                     let nsImage = NSImage(cgImage: cgImage, size: NSSize(width: 36, height: 36))
+                    ThumbnailCache.shared.setObject(nsImage, forKey: key, cost: cgImage.bytesPerRow * cgImage.height)
                     DispatchQueue.main.async { self.thumbnail = nsImage }
                 }
             }
@@ -197,88 +263,80 @@ class MediaScanner: ObservableObject {
     @Published var totalSizeString: String = "0 B"
     @Published var olderThan7DaysCount: Int = 0
     @Published var olderThan7DaysSizeString: String = "0 B"
-    
-    private func getMediaRoots() -> [URL] {
+    @Published var isScanning = false
+    @Published var statusMessage: String?
+
+    struct ScanResult: Sendable {
+        let items: [MediaItem]
+        let totalBytes: Int64
+        let oldBytes: Int64
+        let oldCount: Int
+        let rootsFound: Int
+        let inaccessibleRoots: Int
+    }
+
+    nonisolated private static func getMediaRoots() -> [URL] {
+#if QA_TESTING
+        if let testRoot = ProcessInfo.processInfo.environment["WHATSCLEAN_QA_MEDIA_ROOT"] {
+            return [URL(fileURLWithPath: testRoot, isDirectory: true)]
+        }
+#endif
         let home = FileManager.default.homeDirectoryForCurrentUser
-        var dirs: [URL] = [
+        let specificDirs: [URL] = [
             home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.WhatsApp.shared/Message/Media"),
-            home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.WhatsApp.shared"),
             home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.WhatsAppSMB.shared/Message/Media"),
-            home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.WhatsAppSMB.shared"),
-            home.appendingPathComponent("Library/Group Containers/group.net.whatsapp.family"),
-            home.appendingPathComponent("Library/Containers/net.whatsapp.WhatsApp"),
-            home.appendingPathComponent("Library/Application Support/WhatsApp"),
+            home.appendingPathComponent("Library/Application Support/WhatsApp/Message/Media"),
             home.appendingPathComponent("Library/Application Support/WhatsApp Web")
         ]
-        
-        let containers = home.appendingPathComponent("Library/Containers")
-        let webAppPaths = [
-            home.appendingPathComponent("Applications/WhatsApp Web.app"),
-            URL(fileURLWithPath: "/Applications/WhatsApp Web.app")
-        ]
-        for wApp in webAppPaths {
-            let plistURL = wApp.appendingPathComponent("Contents/Info.plist")
-            if let data = try? Data(contentsOf: plistURL),
-               let plist = try? PropertyListSerialization.propertyList(from: data, options: [], format: nil) as? [String: Any],
-               let bundleId = plist["CFBundleIdentifier"] as? String {
-                let containerURL = containers.appendingPathComponent(bundleId)
-                dirs.append(containerURL)
-            }
-        }
-        
-        var unique: [URL] = []
-        var seen = Set<String>()
-        for d in dirs {
-            let p = d.path
-            if FileManager.default.fileExists(atPath: p) && !seen.contains(p) {
-                seen.insert(p)
-                unique.append(d)
-            }
-        }
-        return unique
+
+        return specificDirs.filter { FileManager.default.fileExists(atPath: $0.path) }
     }
-    
-    func scan() {
+
+    nonisolated static func scanSynchronously() -> ScanResult {
         let roots = getMediaRoots()
-        guard !roots.isEmpty else {
-            self.items = []
-            return
-        }
-        
         var scanned: [MediaItem] = []
         var seenFiles = Set<String>()
         var totalBytes: Int64 = 0
         var oldBytes: Int64 = 0
         var oldCount: Int = 0
-        
+        var inaccessibleRoots = 0
+
         let imageExts: Set<String> = ["jpg", "jpeg", "png", "gif", "svg", "psd", "ai", "heic", "webp", "bmp", "tiff"]
         let videoExts: Set<String> = ["mp4", "mov", "m4v", "mkv", "avi", "webm"]
         let audioExts: Set<String> = ["opus", "mp3", "m4a", "wav", "flac", "ogg", "aac", "wma"]
         let docExts: Set<String> = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "zip", "rar", "7z", "tar", "gz", "csv"]
         let excludedDirs = ["avatars", "stickers", "profile", "profilepictures", "frameworks", "codesignature"]
-        
+
         let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
-        
+
         for root in roots {
-            guard let enumerator = FileManager.default.enumerator(at: root, includingPropertiesForKeys: keys, options: [.skipsHiddenFiles]) else { continue }
-            
+            guard FileManager.default.isReadableFile(atPath: root.path),
+                  let enumerator = FileManager.default.enumerator(
+                    at: root,
+                    includingPropertiesForKeys: keys,
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                  ) else {
+                inaccessibleRoots += 1
+                continue
+            }
+
             while let fileURL = enumerator.nextObject() as? URL {
                 let pathLower = fileURL.path.lowercased()
                 if excludedDirs.contains(where: { pathLower.contains($0) }) { continue }
-                
+
                 guard let res = try? fileURL.resourceValues(forKeys: Set(keys)),
                       res.isRegularFile == true,
                       let size = res.fileSize,
                       let date = res.contentModificationDate,
                       size > 50 else { continue }
-                      
+
                 if seenFiles.contains(fileURL.path) { continue }
                 seenFiles.insert(fileURL.path)
-                
+
                 let ext = fileURL.pathExtension.lowercased()
                 var cat: MediaCategory? = nil
                 var fmt = ext.uppercased()
-                
+
                 if imageExts.contains(ext) { cat = .images }
                 else if videoExts.contains(ext) { cat = .videos }
                 else if audioExts.contains(ext) { cat = .audio }
@@ -297,13 +355,13 @@ class MediaScanner: ObservableObject {
                 }
                 guard let validCategory = cat else { continue }
                 if fmt == "WEBP" && size < 65536 { continue }
-                
+
                 let isOld = date < Date().addingTimeInterval(-7 * 86400)
                 if isOld {
                     oldCount += 1
                     oldBytes += Int64(size)
                 }
-                
+
                 scanned.append(MediaItem(
                     id: fileURL.path,
                     url: fileURL,
@@ -316,31 +374,60 @@ class MediaScanner: ObservableObject {
                 totalBytes += Int64(size)
             }
         }
-        
         scanned.sort { $0.date > $1.date }
-        self.items = scanned
-        self.olderThan7DaysCount = oldCount
-        
+        return ScanResult(
+            items: scanned,
+            totalBytes: totalBytes,
+            oldBytes: oldBytes,
+            oldCount: oldCount,
+            rootsFound: roots.count,
+            inaccessibleRoots: inaccessibleRoots
+        )
+    }
+
+    func scan() {
+        guard !isScanning else { return }
+        isScanning = true
+        Task {
+            let result = await Task.detached(priority: .utility) {
+                MediaScanner.scanSynchronously()
+            }.value
+            apply(result)
+            isScanning = false
+        }
+    }
+
+    private func apply(_ result: ScanResult) {
+        items = result.items
+        olderThan7DaysCount = result.oldCount
         let bcf = ByteCountFormatter()
         bcf.allowedUnits = [.useAll]
         bcf.countStyle = .file
-        self.totalSizeString = bcf.string(fromByteCount: totalBytes)
-        self.olderThan7DaysSizeString = bcf.string(fromByteCount: oldBytes)
+        totalSizeString = bcf.string(fromByteCount: result.totalBytes)
+        olderThan7DaysSizeString = bcf.string(fromByteCount: result.oldBytes)
+        if result.rootsFound == 0 {
+            statusMessage = "Nenhuma pasta de mídia do WhatsApp foi encontrada. Abra o WhatsApp e baixe alguma mídia antes de recarregar."
+        } else if result.inaccessibleRoots > 0 {
+            statusMessage = "O macOS impediu o acesso a uma pasta do WhatsApp. Autorize o WhatsClean em Ajustes do Sistema > Privacidade e Segurança > Acesso Total ao Disco."
+        } else {
+            statusMessage = nil
+        }
     }
-    
-    func deleteOlderThan7Days() -> Int {
+
+    @discardableResult
+    func deleteOlderThan7Days() -> (deleted: Int, failed: Int) {
         var deleted = 0
+        var failed = 0
         for item in items where item.isOlderThan7Days {
             do {
                 try FileManager.default.trashItem(at: item.url, resultingItemURL: nil)
                 deleted += 1
             } catch {
-                try? FileManager.default.removeItem(at: item.url)
-                deleted += 1
+                failed += 1
             }
         }
         scan()
-        return deleted
+        return (deleted, failed)
     }
 }
 
@@ -351,10 +438,13 @@ struct ContentView: View {
     @State private var searchText: String = ""
     @State private var selectedItems = Set<String>()
     @State private var showDelete7DaysAlert: Bool = false
+    @State private var showDeleteSelectedAlert: Bool = false
+    @State private var showAutoCleanConfirmation: Bool = false
     @State private var showAutoCleanFeedbackAlert: Bool = false
-    
-    let timer = Timer.publish(every: 3, on: .main, in: .common).autoconnect()
-    
+    @State private var operationMessage: String?
+
+    let timer = Timer.publish(every: 30, on: .main, in: .common).autoconnect()
+
     var filteredItems: [MediaItem] {
         scanner.items.filter { item in
             let matchesCategory = (selectedCategory == .all || item.category == selectedCategory)
@@ -362,24 +452,24 @@ struct ContentView: View {
             return matchesCategory && matchesSearch
         }
     }
-    
+
     var body: some View {
         VStack(spacing: 0) {
-            // Header Bar
-            HStack(spacing: 10) {
+            VStack(spacing: 8) {
+                HStack(spacing: 12) {
                 Picker("Categoria", selection: $selectedCategory) {
                     ForEach(MediaCategory.allCases) { cat in
                         Label(cat.rawValue, systemImage: cat.icon).tag(cat)
                     }
                 }
                 .pickerStyle(.segmented)
-                .frame(maxWidth: 380)
-                
-                Spacer()
-                
-                HStack {
+                .labelsHidden()
+                .accessibilityLabel("Categoria")
+                .frame(minWidth: 240, maxWidth: .infinity)
+
+                HStack(spacing: 6) {
                     Image(systemName: "magnifyingglass").foregroundColor(.secondary)
-                    TextField("Buscar por nome...", text: $searchText).textFieldStyle(.plain)
+                    TextField("Buscar...", text: $searchText).textFieldStyle(.plain)
                     if !searchText.isEmpty {
                         Button(action: { searchText = "" }) {
                             Image(systemName: "xmark.circle.fill").foregroundColor(.secondary)
@@ -389,56 +479,70 @@ struct ContentView: View {
                 .padding(6)
                 .background(Color(NSColor.controlBackgroundColor))
                 .cornerRadius(8)
-                .frame(width: 200)
-                
+                .frame(minWidth: 140, idealWidth: 200, maxWidth: 260)
+                }
+
+                HStack(spacing: 10) {
+                Spacer(minLength: 0)
                 Button(action: {
-                    autoCleaner.toggle()
-                    showAutoCleanFeedbackAlert = true
+                    if autoCleaner.isEnabled {
+                        autoCleaner.disable()
+                        showAutoCleanFeedbackAlert = true
+                    } else {
+                        showAutoCleanConfirmation = true
+                    }
                 }) {
-                    HStack(spacing: 6) {
+                    HStack(spacing: 5) {
                         Image(systemName: autoCleaner.isEnabled ? "bolt.shield.fill" : "bolt.shield")
-                        Text(autoCleaner.isEnabled ? "Auto-Limpeza (7d): ATIVA" : "Ativar Auto-Limpeza (7d)")
-                            .fontWeight(autoCleaner.isEnabled ? .semibold : .regular)
+                        Text(autoCleaner.isEnabled ? "Auto (7d): ON" : "Auto (7d)")
+                            .font(.system(.body, design: .rounded).weight(.medium))
+                            .lineLimit(1)
                     }
                 }
                 .buttonStyle(.borderedProminent)
                 .tint(autoCleaner.isEnabled ? .green : .secondary)
-                
+                .help("Limpeza automática em segundo plano a cada 24h para arquivos com mais de 7 dias")
+
                 Button(action: { showDelete7DaysAlert = true }) {
-                    Label("Limpar +7d (\(scanner.olderThan7DaysCount))", systemImage: "clock.arrow.circlepath")
+                    HStack(spacing: 5) {
+                        Image(systemName: "trash.circle")
+                        Text("Limpar +7d (\(scanner.olderThan7DaysCount))")
+                            .lineLimit(1)
+                    }
                 }
                 .foregroundColor(scanner.olderThan7DaysCount > 0 ? .orange : .secondary)
                 .disabled(scanner.olderThan7DaysCount == 0)
-                
+
                 Button(action: { scanner.scan() }) {
-                    Image(systemName: "arrow.clockwise")
+                    Label("Recarregar", systemImage: "arrow.clockwise")
+                }
+                .help("Recarregar lista de mídias")
                 }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 12)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 10)
             .background(Color(NSColor.windowBackgroundColor))
-            
+
             Divider()
-            
-            // Table
+
             Table(filteredItems, selection: $selectedItems) {
                 TableColumn("Prévia") { item in
                     AsyncThumbnailView(item: item)
                 }
                 .width(42)
-                
+
                 TableColumn("Nome") { item in
                     VStack(alignment: .leading, spacing: 2) {
                         Text(item.name)
                             .lineLimit(1)
-                            .fontWeight(.medium)
+                            .font(.body.weight(.medium))
                         Text(item.category.rawValue)
                             .font(.caption2)
                             .foregroundColor(.secondary)
                     }
                 }
-                .width(min: 240, ideal: 360)
-                
+                .width(min: 220, ideal: 340)
+
                 TableColumn("Formato") { item in
                     Text(item.ext)
                         .font(.caption.bold())
@@ -447,20 +551,39 @@ struct ContentView: View {
                         .background(Color.accentColor.opacity(0.15))
                         .cornerRadius(4)
                 }
-                .width(75)
-                
+                .width(70)
+
                 TableColumn("Tamanho") { item in
                     Text(item.sizeFormatted)
                         .font(.system(.body, design: .monospaced))
                 }
-                .width(100)
-                
+                .width(95)
+
                 TableColumn("Data") { item in
                     Text(item.dateFormatted)
                         .font(.system(.body, design: .monospaced))
                         .foregroundColor(item.isOlderThan7Days ? .orange : .secondary)
                 }
-                .width(170)
+                .width(160)
+            }
+            .overlay {
+                if scanner.isScanning && scanner.items.isEmpty {
+                    ProgressView("Procurando mídias…")
+                } else if let message = scanner.statusMessage, scanner.items.isEmpty {
+                    VStack(spacing: 10) {
+                        Image(systemName: "folder.badge.questionmark")
+                            .font(.system(size: 34))
+                            .foregroundColor(.secondary)
+                        Text("Mídias indisponíveis")
+                            .font(.headline)
+                        Text(message)
+                            .font(.callout)
+                            .foregroundColor(.secondary)
+                            .multilineTextAlignment(.center)
+                            .frame(maxWidth: 420)
+                    }
+                    .padding(24)
+                }
             }
             .contextMenu {
                 Button("Quick Look (Espaço)") { quickLookSelected() }
@@ -468,89 +591,113 @@ struct ContentView: View {
                 Button("Revelar no Finder") { revealSelected() }
                 Button("Salvar em Downloads") { saveSelected() }
                 Divider()
-                Button("Mover para o Lixo", role: .destructive) { deleteSelected() }
+                Button("Mover para o Lixo", role: .destructive) { showDeleteSelectedAlert = true }
             }
-            
+
             Divider()
-            
-            // Bottom Action Bar
-            HStack(spacing: 12) {
+
+            VStack(spacing: 8) {
+                HStack {
                 Text("\(filteredItems.count) arquivo(s) • Total: \(scanner.totalSizeString)")
                     .font(.callout).foregroundColor(.secondary)
                 Spacer()
-                
+                }
+
+                HStack(spacing: 10) {
+                Spacer(minLength: 0)
                 Button(action: quickLookSelected) {
-                    Label("Quick Look (Espaço)", systemImage: "eye.circle")
+                    Label("Quick Look", systemImage: "eye.circle")
                 }
                 .disabled(selectedItems.isEmpty)
                 .keyboardShortcut(.space, modifiers: [])
-                
+
                 Button(action: openSelected) {
                     Label("Abrir", systemImage: "arrow.up.forward.app")
                 }
                 .disabled(selectedItems.isEmpty)
-                
+
                 Button(action: revealSelected) {
                     Label("No Finder", systemImage: "folder")
                 }
                 .disabled(selectedItems.isEmpty)
-                
+
                 Button(action: saveSelected) {
-                    Label("Salvar em Downloads", systemImage: "arrow.down.circle")
+                    Label("Salvar", systemImage: "arrow.down.circle")
                 }
                 .disabled(selectedItems.isEmpty)
-                
-                Button(role: .destructive, action: deleteSelected) {
+
+                Button(role: .destructive, action: { showDeleteSelectedAlert = true }) {
                     Label("Mover para o Lixo", systemImage: "trash")
                 }
                 .disabled(selectedItems.isEmpty)
+                }
             }
-            .padding(.horizontal, 16)
-            .padding(.vertical, 10)
+            .padding(.horizontal, 14)
+            .padding(.vertical, 8)
             .background(Color(NSColor.windowBackgroundColor))
         }
-        .frame(minWidth: 980, minHeight: 600)
+        .frame(minWidth: 680, minHeight: 500)
         .navigationTitle("WhatsClean")
         .alert("Limpar Mídias com mais de 7 dias?", isPresented: $showDelete7DaysAlert) {
             Button("Mover para o Lixo", role: .destructive) {
-                _ = scanner.deleteOlderThan7Days()
+                let result = scanner.deleteOlderThan7Days()
+                operationMessage = deletionMessage(deleted: result.deleted, failed: result.failed)
             }
             Button("Cancelar", role: .cancel) { }
         } message: {
             Text("Foram encontrados \(scanner.olderThan7DaysCount) arquivo(s) com mais de 7 dias (\(scanner.olderThan7DaysSizeString)). Eles serão movidos para o Lixo do Mac para liberar espaço.")
         }
+        .alert("Mover arquivos selecionados para o Lixo?", isPresented: $showDeleteSelectedAlert) {
+            Button("Mover para o Lixo", role: .destructive) { deleteSelected() }
+            Button("Cancelar", role: .cancel) { }
+        } message: {
+            Text("Os \(selectedItems.count) arquivo(s) selecionados serão movidos para o Lixo do Mac.")
+        }
+        .alert("Resultado da operação", isPresented: Binding(
+            get: { operationMessage != nil },
+            set: { if !$0 { operationMessage = nil } }
+        )) {
+            Button("OK") { operationMessage = nil }
+        } message: {
+            Text(operationMessage ?? "")
+        }
         .alert(autoCleaner.isEnabled ? "Auto-Limpeza Ativada com Sucesso!" : "Auto-Limpeza Desativada", isPresented: $showAutoCleanFeedbackAlert) {
             Button("OK") { }
         } message: {
-            if autoCleaner.isEnabled {
-                Text("O WhatsClean executará a limpeza automática diária de todos os arquivos do WhatsApp com mais de 7 dias em segundo plano (com o aplicativo aberto ou fechado).\n\nQuando finaliza, o processo consome 0% de CPU e 0 MB de memória RAM.")
-            } else {
-                Text("A rotina automática em segundo plano foi desativada.")
+            Text(autoCleaner.feedbackMessage ?? "A configuração da limpeza automática foi atualizada.")
+        }
+        .alert("Ativar limpeza automática?", isPresented: $showAutoCleanConfirmation) {
+            Button("Ativar", role: .destructive) {
+                autoCleaner.enable()
+                showAutoCleanFeedbackAlert = true
             }
+            Button("Cancelar", role: .cancel) { }
+        } message: {
+            Text("Uma vez por dia, o WhatsClean moverá automaticamente para o Lixo as mídias do WhatsApp com mais de 7 dias. Você poderá desativar essa opção a qualquer momento.")
         }
         .onAppear { scanner.scan() }
         .onReceive(timer) { _ in scanner.scan() }
     }
-    
+
     private func getSelectedURLs() -> [URL] {
         return scanner.items.filter { selectedItems.contains($0.id) }.map { $0.url }
     }
-    
+
     private func quickLookSelected() {
         if let first = getSelectedURLs().first {
             QuickLookManager.shared.preview(url: first)
         }
     }
-    
+
     private func openSelected() {
         for u in getSelectedURLs() { NSWorkspace.shared.open(u) }
     }
-    
+
     private func revealSelected() {
         let urls = getSelectedURLs()
         if !urls.isEmpty { NSWorkspace.shared.activateFileViewerSelecting(urls) }
     }
-    
+
     private func saveSelected() {
         let downloads = FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Downloads")
         for u in getSelectedURLs() {
@@ -558,36 +705,212 @@ struct ContentView: View {
             if u.pathExtension.lowercased() == "thumb" {
                 dest = downloads.appendingPathComponent(u.deletingPathExtension().appendingPathExtension("jpg").lastPathComponent)
             }
-            try? FileManager.default.copyItem(at: u, to: dest)
+            dest = uniqueDestination(for: dest)
+            do {
+                try FileManager.default.copyItem(at: u, to: dest)
+            } catch {
+                operationMessage = "Não foi possível salvar \(u.lastPathComponent): \(error.localizedDescription)"
+            }
         }
     }
-    
+
+    private func uniqueDestination(for requestedURL: URL) -> URL {
+        guard FileManager.default.fileExists(atPath: requestedURL.path) else { return requestedURL }
+        let directory = requestedURL.deletingLastPathComponent()
+        let ext = requestedURL.pathExtension
+        let base = requestedURL.deletingPathExtension().lastPathComponent
+        var index = 2
+        while true {
+            let suffix = "\(base) \(index)" + (ext.isEmpty ? "" : ".\(ext)")
+            let candidate = directory.appendingPathComponent(suffix)
+            if !FileManager.default.fileExists(atPath: candidate.path) { return candidate }
+            index += 1
+        }
+    }
+
     private func deleteSelected() {
-        for u in getSelectedURLs() { try? FileManager.default.trashItem(at: u, resultingItemURL: nil) }
+        var deleted = 0
+        var failed = 0
+        for u in getSelectedURLs() {
+            do {
+                try FileManager.default.trashItem(at: u, resultingItemURL: nil)
+                deleted += 1
+            } catch {
+                failed += 1
+            }
+        }
+        selectedItems.removeAll()
+        operationMessage = deletionMessage(deleted: deleted, failed: failed)
         scanner.scan()
+    }
+
+    private func deletionMessage(deleted: Int, failed: Int) -> String {
+        if failed == 0 { return "\(deleted) arquivo(s) movido(s) para o Lixo." }
+        return "\(deleted) arquivo(s) movido(s) para o Lixo; \(failed) não puderam ser movidos. Verifique as permissões do macOS."
     }
 }
 
+@MainActor
+final class UpdateManager: ObservableObject {
+    static let shared = UpdateManager()
+
+    let controller: SPUStandardUpdaterController
+
+    private init() {
+        controller = SPUStandardUpdaterController(
+            startingUpdater: true,
+            updaterDelegate: nil,
+            userDriverDelegate: nil
+        )
+    }
+
+    var automaticallyChecksForUpdates: Bool {
+        get { controller.updater.automaticallyChecksForUpdates }
+        set {
+            controller.updater.automaticallyChecksForUpdates = newValue
+            objectWillChange.send()
+        }
+    }
+
+    var automaticallyDownloadsUpdates: Bool {
+        get { controller.updater.automaticallyDownloadsUpdates }
+        set {
+            controller.updater.automaticallyDownloadsUpdates = newValue
+            objectWillChange.send()
+        }
+    }
+
+    func checkForUpdates() {
+        controller.checkForUpdates(nil)
+    }
+}
+
+struct WhatsCleanSettingsView: View {
+    @AppStorage("showMenuBarIcon") private var showMenuBarIcon = true
+    @ObservedObject private var updates = UpdateManager.shared
+
+    var body: some View {
+        Form {
+            Section("Geral") {
+                Toggle("Mostrar o WhatsClean na barra de menus", isOn: $showMenuBarIcon)
+                    .onChange(of: showMenuBarIcon) { _ in
+                        NotificationCenter.default.post(name: .menuBarPreferenceChanged, object: nil)
+                    }
+            }
+
+            Section("Atualizações") {
+                Toggle("Procurar atualizações automaticamente", isOn: Binding(
+                    get: { updates.automaticallyChecksForUpdates },
+                    set: { updates.automaticallyChecksForUpdates = $0 }
+                ))
+                Toggle("Baixar atualizações automaticamente", isOn: Binding(
+                    get: { updates.automaticallyDownloadsUpdates },
+                    set: { updates.automaticallyDownloadsUpdates = $0 }
+                ))
+                .disabled(!updates.automaticallyChecksForUpdates)
+
+                Button("Procurar atualização agora") {
+                    updates.checkForUpdates()
+                }
+            }
+
+            Text("As atualizações são verificadas e instaladas com segurança pelo Sparkle usando os lançamentos oficiais do WhatsClean no GitHub.")
+                .font(.caption)
+                .foregroundColor(.secondary)
+                .fixedSize(horizontal: false, vertical: true)
+        }
+        .padding(24)
+        .frame(width: 480)
+    }
+}
+
+extension Notification.Name {
+    static let menuBarPreferenceChanged = Notification.Name("WhatsCleanMenuBarPreferenceChanged")
+}
+
+@MainActor
 class AppDelegate: NSObject, NSApplicationDelegate {
+    private var statusItem: NSStatusItem?
+    private var preferenceObserver: NSObjectProtocol?
+
     func applicationDidFinishLaunching(_ notification: Notification) {
+        UserDefaults.standard.register(defaults: ["showMenuBarIcon": true])
+        _ = UpdateManager.shared
+        preferenceObserver = NotificationCenter.default.addObserver(
+            forName: .menuBarPreferenceChanged,
+            object: nil,
+            queue: .main
+        ) { [weak self] _ in
+            Task { @MainActor in self?.updateMenuBarItem() }
+        }
+        updateMenuBarItem()
         NSApp.setActivationPolicy(.regular)
         NSApp.activate(ignoringOtherApps: true)
     }
+
+    func applicationWillTerminate(_ notification: Notification) {
+        if let preferenceObserver {
+            NotificationCenter.default.removeObserver(preferenceObserver)
+        }
+    }
+
+    private func updateMenuBarItem() {
+        if UserDefaults.standard.bool(forKey: "showMenuBarIcon") {
+            guard statusItem == nil else { return }
+            let item = NSStatusBar.system.statusItem(withLength: NSStatusItem.squareLength)
+            item.button?.image = NSImage(systemSymbolName: "sparkles", accessibilityDescription: "WhatsClean")
+
+            let menu = NSMenu()
+            menu.addItem(withTitle: "Abrir WhatsClean", action: #selector(showMainWindow), keyEquivalent: "")
+            menu.addItem(withTitle: "Procurar atualizações…", action: #selector(checkForUpdates), keyEquivalent: "")
+            menu.addItem(NSMenuItem.separator())
+            menu.addItem(withTitle: "Configurações…", action: #selector(showSettings), keyEquivalent: ",")
+            menu.addItem(NSMenuItem.separator())
+            let quitItem = menu.addItem(withTitle: "Sair", action: #selector(NSApplication.terminate(_:)), keyEquivalent: "q")
+            for menuItem in menu.items where menuItem !== quitItem { menuItem.target = self }
+            quitItem.target = NSApp
+            item.menu = menu
+            statusItem = item
+        } else if let statusItem {
+            NSStatusBar.system.removeStatusItem(statusItem)
+            self.statusItem = nil
+        }
+    }
+
+    @objc private func showMainWindow() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.windows.first(where: { $0.canBecomeMain })?.makeKeyAndOrderFront(nil)
+    }
+
+    @objc private func checkForUpdates() {
+        UpdateManager.shared.checkForUpdates()
+    }
+
+    @objc private func showSettings() {
+        NSApp.activate(ignoringOtherApps: true)
+        NSApp.sendAction(Selector(("showSettingsWindow:")), to: nil, from: nil)
+    }
 }
 
+#if !UI_TEST_RENDER
 @main
 struct WhatsCleanApp: App {
     @NSApplicationDelegateAdaptor(AppDelegate.self) var appDelegate
-    
+
     init() {
         if CommandLine.arguments.contains("--clean-7days") {
             let scanner = MediaScanner()
-            _ = scanner.deleteOlderThan7Days()
-            exit(0)
+            let result = MediaScanner.scanSynchronously()
+            scanner.items = result.items
+            let deletion = scanner.deleteOlderThan7Days()
+            appLogger.info("Limpeza automática finalizada: \(deletion.deleted) movidos, \(deletion.failed) falhas")
+            exit(deletion.failed == 0 ? 0 : 1)
         }
     }
-    
+
     var body: some Scene {
         WindowGroup { ContentView() }
+        Settings { WhatsCleanSettingsView() }
     }
 }
+#endif

@@ -1,0 +1,8 @@
+.DS_Store
+.build/
+WhatsClean.app/
+WhatsClean.dmg
+WhatsClean-macOS.zip
+Releases/
+ReleaseAssets/
+Vendor/Sparkle/

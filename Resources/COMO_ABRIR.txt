@@ -1,0 +1,34 @@
+LEIA PRIMEIRO — COMO INSTALAR O WHATSCLEAN
+
+Compatibilidade: Macs Apple Silicon (M1, M2, M3, M4 ou mais recente).
+
+O WhatsClean é gratuito e não foi notarizado pela Apple. Por isso, o macOS pode
+bloquear somente a primeira abertura. Isso não significa que o arquivo esteja
+corrompido.
+
+INSTALAÇÃO
+
+1. Arraste WhatsClean.app para a pasta Applications deste DMG.
+2. Abra a pasta Aplicativos do Mac.
+3. Clique com o botão direito sobre WhatsClean e selecione Abrir.
+4. Confirme clicando em Abrir, caso essa opção seja apresentada.
+
+SE O MACOS AINDA BLOQUEAR
+
+1. Tente abrir o WhatsClean normalmente uma vez.
+2. Abra Ajustes do Sistema > Privacidade e Segurança.
+3. Role até a seção Segurança.
+4. Clique em Abrir Mesmo Assim ao lado da mensagem sobre o WhatsClean.
+5. Confirme com Touch ID ou a senha do Mac.
+
+ÚLTIMO RECURSO — SOMENTE SE AS OPÇÕES ACIMA NÃO APARECEREM
+
+O aplicativo deve estar na pasta Aplicativos. Abra o Terminal, copie a linha
+abaixo inteira, pressione Enter e depois abra o WhatsClean novamente:
+
+xattr -dr com.apple.quarantine /Applications/WhatsClean.app
+
+Esse comando remove apenas a marca de download do WhatsClean. Não desative o
+Gatekeeper do Mac e não use comandos que alterem a segurança global do sistema.
+
+A confirmação é necessária somente na primeira abertura de cada versão baixada.

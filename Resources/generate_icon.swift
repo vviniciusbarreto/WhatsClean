@@ -1,91 +1,229 @@
 import AppKit
+import CoreGraphics
+import Foundation
 
-func renderAppIcon(size: Int) -> NSImage {
-    let rep = NSBitmapImageRep(bitmapDataPlanes: nil, pixelsWide: size, pixelsHigh: size, bitsPerSample: 8, samplesPerPixel: 4, hasAlpha: true, isPlanar: false, colorSpaceName: .deviceRGB, bytesPerRow: 0, bitsPerPixel: 0)!
-    rep.size = NSSize(width: size, height: size)
-    NSGraphicsContext.saveGraphicsState()
-    NSGraphicsContext.current = NSGraphicsContext(bitmapImageRep: rep)
-    let S = CGFloat(size)
-    let margin = S * 0.08
-    let squircleRect = NSRect(x: margin, y: margin, width: S - 2*margin, height: S - 2*margin)
-    let cornerRadius = S * 0.22
-    let bgPath = NSBezierPath(roundedRect: squircleRect, xRadius: cornerRadius, yRadius: cornerRadius)
-    let gradient = NSGradient(colors: [NSColor(red: 0.18, green: 0.86, blue: 0.45, alpha: 1.0), NSColor(red: 0.04, green: 0.62, blue: 0.32, alpha: 1.0)])!
-    gradient.draw(in: bgPath, angle: -45)
-    bgPath.lineWidth = S * 0.015
-    NSColor.white.withAlphaComponent(0.25).setStroke()
-    bgPath.stroke()
-    
-    let bubbleCenter = NSPoint(x: S * 0.46, y: S * 0.54)
-    let bubbleRadius = S * 0.24
-    let shadow = NSShadow()
-    shadow.shadowOffset = NSSize(width: 0, height: -S * 0.02)
-    shadow.shadowBlurRadius = S * 0.04
-    shadow.shadowColor = NSColor.black.withAlphaComponent(0.22)
-    shadow.set()
-    let bubble = NSBezierPath()
-    bubble.appendArc(withCenter: bubbleCenter, radius: bubbleRadius, startAngle: 0, endAngle: 360)
-    bubble.move(to: NSPoint(x: bubbleCenter.x - bubbleRadius * 0.70, y: bubbleCenter.y - bubbleRadius * 0.65))
-    bubble.line(to: NSPoint(x: bubbleCenter.x - bubbleRadius * 1.15, y: bubbleCenter.y - bubbleRadius * 1.05))
-    bubble.line(to: NSPoint(x: bubbleCenter.x - bubbleRadius * 0.25, y: bubbleCenter.y - bubbleRadius * 0.95))
-    bubble.close()
-    NSColor.white.set()
-    bubble.fill()
-    
-    if let phone = NSImage(systemSymbolName: "phone.fill", accessibilityDescription: nil) {
-        let pSize = S * 0.24
-        let pRect = NSRect(x: bubbleCenter.x - pSize/2, y: bubbleCenter.y - pSize/2, width: pSize/2, height: pSize)
-        let pColor = NSColor(red: 0.06, green: 0.70, blue: 0.36, alpha: 1.0)
-        let tintedPhone = NSImage(size: NSSize(width: pSize, height: pSize))
-        tintedPhone.lockFocus()
-        pColor.set()
-        NSRect(origin: .zero, size: tintedPhone.size).fill()
-        phone.draw(in: NSRect(origin: .zero, size: tintedPhone.size), from: .zero, operation: .destinationIn, fraction: 1.0)
-        tintedPhone.unlockFocus()
-        tintedPhone.draw(in: pRect)
+func createIconBitmap(pixels: Int) -> CGImage? {
+    let width = pixels
+    let height = pixels
+    let colorSpace = CGColorSpaceCreateDeviceRGB()
+    let bitmapInfo = CGBitmapInfo(rawValue: CGImageAlphaInfo.premultipliedLast.rawValue)
+
+    guard let ctx = CGContext(
+        data: nil,
+        width: width,
+        height: height,
+        bitsPerComponent: 8,
+        bytesPerRow: width * 4,
+        space: colorSpace,
+        bitmapInfo: bitmapInfo.rawValue
+    ) else {
+        return nil
     }
-    
-    let broomShadow = NSShadow()
-    broomShadow.shadowOffset = NSSize(width: S * 0.02, height: -S * 0.03)
-    broomShadow.shadowBlurRadius = S * 0.05
-    broomShadow.shadowColor = NSColor.black.withAlphaComponent(0.35)
-    broomShadow.set()
-    if let broom = NSImage(systemSymbolName: "broom.fill", accessibilityDescription: nil) {
-        let bSize = S * 0.52
-        let broomImg = NSImage(size: NSSize(width: bSize, height: bSize))
-        broomImg.lockFocus()
-        NSColor(red: 1.0, green: 0.84, blue: 0.28, alpha: 1.0).set()
-        NSRect(origin: .zero, size: broomImg.size).fill()
-        broom.draw(in: NSRect(origin: .zero, size: broomImg.size), from: .zero, operation: .destinationIn, fraction: 1.0)
-        broomImg.unlockFocus()
-        broomImg.draw(in: NSRect(x: S * 0.36, y: S * 0.14, width: bSize, height: bSize))
+
+    ctx.setAllowsAntialiasing(true)
+    ctx.setShouldAntialias(true)
+    ctx.interpolationQuality = .high
+
+    let size = CGFloat(pixels)
+    let s = size / 1024.0
+
+    // Squircle
+    let margin: CGFloat = 100.0 * s
+    let rectSize: CGFloat = size - (margin * 2.0)
+    let cornerRadius: CGFloat = 185.0 * s
+    let squircleRect = CGRect(x: margin, y: margin, width: rectSize, height: rectSize)
+    let squirclePath = CGPath(roundedRect: squircleRect, cornerWidth: cornerRadius, cornerHeight: cornerRadius, transform: nil)
+
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -12.0 * s), blur: 24.0 * s, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.35))
+    ctx.addPath(squirclePath)
+    ctx.setFillColor(CGColor(red: 0, green: 0, blue: 0, alpha: 1.0))
+    ctx.fillPath()
+    ctx.restoreGState()
+
+    // Background Emerald Gradient
+    ctx.saveGState()
+    ctx.addPath(squirclePath)
+    ctx.clip()
+
+    let bgColors = [
+        CGColor(red: 0.05, green: 0.45, blue: 0.28, alpha: 1.0),
+        CGColor(red: 0.12, green: 0.72, blue: 0.42, alpha: 1.0),
+        CGColor(red: 0.22, green: 0.88, blue: 0.54, alpha: 1.0)
+    ] as CFArray
+    let bgLocations: [CGFloat] = [0.0, 0.55, 1.0]
+    if let bgGradient = CGGradient(colorsSpace: colorSpace, colors: bgColors, locations: bgLocations) {
+        ctx.drawLinearGradient(bgGradient, start: CGPoint(x: margin, y: margin), end: CGPoint(x: size - margin, y: size - margin), options: [])
     }
-    
-    if let sparkles = NSImage(systemSymbolName: "sparkles", accessibilityDescription: nil) {
-        let sSize = S * 0.24
-        let sImg = NSImage(size: NSSize(width: sSize, height: sSize))
-        sImg.lockFocus()
-        NSColor.white.set()
-        NSRect(origin: .zero, size: sImg.size).fill()
-        sparkles.draw(in: NSRect(origin: .zero, size: sImg.size), from: .zero, operation: .destinationIn, fraction: 1.0)
-        sImg.unlockFocus()
-        sImg.draw(in: NSRect(x: S * 0.66, y: S * 0.66, width: sSize, height: sSize))
+
+    let glowColors = [
+        CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.22),
+        CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.0)
+    ] as CFArray
+    if let glowGradient = CGGradient(colorsSpace: colorSpace, colors: glowColors, locations: [0.0, 1.0]) {
+        ctx.drawRadialGradient(glowGradient, startCenter: CGPoint(x: size * 0.75, y: size * 0.75), startRadius: 0, endCenter: CGPoint(x: size * 0.75, y: size * 0.75), endRadius: size * 0.6, options: [])
     }
-    NSGraphicsContext.restoreGraphicsState()
-    let resultImage = NSImage(size: NSSize(width: size, height: size))
-    resultImage.addRepresentation(rep)
-    return resultImage
+
+    let innerBorder = CGPath(roundedRect: squircleRect.insetBy(dx: 2.0 * s, dy: 2.0 * s), cornerWidth: cornerRadius - 2.0 * s, cornerHeight: cornerRadius - 2.0 * s, transform: nil)
+    ctx.addPath(innerBorder)
+    ctx.setLineWidth(2.5 * s)
+    ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.35))
+    ctx.strokePath()
+    ctx.restoreGState()
+
+    // Central Chat Message Bubble
+    let bubbleCenter = CGPoint(x: size * 0.44, y: size * 0.52)
+    let bubbleWidth = 440.0 * s
+    let bubbleHeight = 360.0 * s
+    let bubbleRect = CGRect(x: bubbleCenter.x - bubbleWidth/2, y: bubbleCenter.y - bubbleHeight/2 + 20*s, width: bubbleWidth, height: bubbleHeight)
+    let bubbleRadius = 80.0 * s
+
+    ctx.saveGState()
+    ctx.setShadow(offset: CGSize(width: 0, height: -8.0 * s), blur: 18.0 * s, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.28))
+
+    let bubblePath = CGMutablePath()
+    bubblePath.addRoundedRect(in: bubbleRect, cornerWidth: bubbleRadius, cornerHeight: bubbleRadius)
+    let tailStart = CGPoint(x: bubbleRect.minX + 50*s, y: bubbleRect.minY + 20*s)
+    let tailTip = CGPoint(x: bubbleRect.minX - 35*s, y: bubbleRect.minY - 35*s)
+    let tailEnd = CGPoint(x: bubbleRect.minX + 110*s, y: bubbleRect.minY)
+    bubblePath.move(to: tailStart)
+    bubblePath.addQuadCurve(to: tailTip, control: CGPoint(x: bubbleRect.minX - 10*s, y: bubbleRect.minY - 5*s))
+    bubblePath.addQuadCurve(to: tailEnd, control: CGPoint(x: bubbleRect.minX + 40*s, y: bubbleRect.minY - 15*s))
+    bubblePath.closeSubpath()
+
+    ctx.addPath(bubblePath)
+    ctx.setFillColor(CGColor(red: 0.98, green: 0.99, blue: 1.0, alpha: 0.96))
+    ctx.fillPath()
+
+    ctx.addPath(bubblePath)
+    ctx.setLineWidth(3.0 * s)
+    ctx.setStrokeColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.8))
+    ctx.strokePath()
+
+    let phoneSize = 110.0 * s
+    let phoneCenter = CGPoint(x: bubbleCenter.x - 30*s, y: bubbleCenter.y + 25*s)
+    let phoneRect = CGRect(x: phoneCenter.x - phoneSize/2, y: phoneCenter.y - phoneSize/2, width: phoneSize, height: phoneSize)
+    if let phoneImg = NSImage(systemSymbolName: "phone.fill", accessibilityDescription: nil) {
+        let tinted = NSImage(size: NSSize(width: phoneSize, height: phoneSize))
+        tinted.lockFocus()
+        NSColor(red: 0.10, green: 0.65, blue: 0.38, alpha: 1.0).set()
+        NSRect(origin: .zero, size: tinted.size).fill()
+        phoneImg.draw(in: NSRect(origin: .zero, size: tinted.size), from: .zero, operation: .destinationIn, fraction: 1.0)
+        tinted.unlockFocus()
+        if let cg = tinted.cgImage(forProposedRect: nil, context: nil, hints: nil) {
+            ctx.draw(cg, in: phoneRect)
+        }
+    }
+    ctx.restoreGState()
+
+    // Stylized Cleaning Broom
+    ctx.saveGState()
+    let broomOrigin = CGPoint(x: size * 0.68, y: size * 0.44)
+    ctx.translateBy(x: broomOrigin.x, y: broomOrigin.y)
+    ctx.rotate(by: -0.58)
+
+    ctx.setShadow(offset: CGSize(width: 6.0 * s, height: -12.0 * s), blur: 18.0 * s, color: CGColor(red: 0, green: 0, blue: 0, alpha: 0.38))
+
+    let handleWidth = 24.0 * s
+    let handleHeight = 440.0 * s
+    let handleRect = CGRect(x: -handleWidth/2, y: 10*s, width: handleWidth, height: handleHeight)
+    let handlePath = CGPath(roundedRect: handleRect, cornerWidth: 12.0 * s, cornerHeight: 12.0 * s, transform: nil)
+
+    ctx.saveGState()
+    ctx.addPath(handlePath)
+    ctx.clip()
+    let handleColors = [
+        CGColor(red: 0.82, green: 0.58, blue: 0.28, alpha: 1.0),
+        CGColor(red: 0.96, green: 0.80, blue: 0.48, alpha: 1.0),
+        CGColor(red: 0.70, green: 0.45, blue: 0.18, alpha: 1.0)
+    ] as CFArray
+    if let handleGrad = CGGradient(colorsSpace: colorSpace, colors: handleColors, locations: [0.0, 0.45, 1.0]) {
+        ctx.drawLinearGradient(handleGrad, start: CGPoint(x: -handleWidth/2, y: 0), end: CGPoint(x: handleWidth/2, y: 0), options: [])
+    }
+    ctx.restoreGState()
+
+    let collarRect = CGRect(x: -28.0 * s, y: 0, width: 56.0 * s, height: 26.0 * s)
+    let collarPath = CGPath(roundedRect: collarRect, cornerWidth: 6.0 * s, cornerHeight: 6.0 * s, transform: nil)
+    ctx.addPath(collarPath)
+    ctx.setFillColor(CGColor(red: 0.90, green: 0.92, blue: 0.96, alpha: 1.0))
+    ctx.fillPath()
+
+    let bristlePath = CGMutablePath()
+    bristlePath.move(to: CGPoint(x: -26.0 * s, y: 0))
+    bristlePath.addLine(to: CGPoint(x: -95.0 * s, y: -190.0 * s))
+    bristlePath.addQuadCurve(to: CGPoint(x: 95.0 * s, y: -190.0 * s), control: CGPoint(x: 0, y: -205.0 * s))
+    bristlePath.addLine(to: CGPoint(x: 26.0 * s, y: 0))
+    bristlePath.closeSubpath()
+
+    ctx.saveGState()
+    ctx.addPath(bristlePath)
+    ctx.clip()
+    let bristleColors = [
+        CGColor(red: 0.98, green: 0.78, blue: 0.22, alpha: 1.0),
+        CGColor(red: 0.90, green: 0.65, blue: 0.15, alpha: 1.0),
+        CGColor(red: 0.78, green: 0.50, blue: 0.10, alpha: 1.0)
+    ] as CFArray
+    if let bristleGrad = CGGradient(colorsSpace: colorSpace, colors: bristleColors, locations: [0.0, 0.6, 1.0]) {
+        ctx.drawLinearGradient(bristleGrad, start: CGPoint(x: 0, y: 0), end: CGPoint(x: 0, y: -190.0 * s), options: [])
+    }
+
+    ctx.setLineWidth(2.5 * s)
+    ctx.setStrokeColor(CGColor(red: 0.68, green: 0.42, blue: 0.08, alpha: 0.45))
+    for xOffset in [-60, -40, -20, 0, 20, 40, 60] {
+        let x = CGFloat(xOffset) * s
+        ctx.move(to: CGPoint(x: x * 0.28, y: -10 * s))
+        ctx.addLine(to: CGPoint(x: x, y: -185 * s))
+        ctx.strokePath()
+    }
+    ctx.restoreGState()
+
+    ctx.addPath(bristlePath)
+    ctx.setLineWidth(2.0 * s)
+    ctx.setStrokeColor(CGColor(red: 1.0, green: 0.90, blue: 0.50, alpha: 0.6))
+    ctx.strokePath()
+    ctx.restoreGState()
+
+    // Radiant Magic Sparkles ✨
+    func drawSparkle(center: CGPoint, radius: CGFloat, haloColor: CGColor) {
+        ctx.saveGState()
+        let haloGradColors = [haloColor, CGColor(red: 1, green: 1, blue: 1, alpha: 0.0)] as CFArray
+        if let hg = CGGradient(colorsSpace: colorSpace, colors: haloGradColors, locations: [0.0, 1.0]) {
+            ctx.drawRadialGradient(hg, startCenter: center, startRadius: 0, endCenter: center, endRadius: radius * 1.6, options: [])
+        }
+
+        let starPath = CGMutablePath()
+        starPath.move(to: CGPoint(x: center.x, y: center.y + radius))
+        starPath.addQuadCurve(to: CGPoint(x: center.x + radius, y: center.y), control: CGPoint(x: center.x + radius*0.25, y: center.y + radius*0.25))
+        starPath.addQuadCurve(to: CGPoint(x: center.x, y: center.y - radius), control: CGPoint(x: center.x + radius*0.25, y: center.y - radius*0.25))
+        starPath.addQuadCurve(to: CGPoint(x: center.x - radius, y: center.y), control: CGPoint(x: center.x - radius*0.25, y: center.y - radius*0.25))
+        starPath.addQuadCurve(to: CGPoint(x: center.x, y: center.y + radius), control: CGPoint(x: center.x - radius*0.25, y: center.y + radius*0.25))
+        starPath.closeSubpath()
+
+        ctx.setShadow(offset: .zero, blur: 10 * s, color: CGColor(red: 1, green: 1, blue: 1, alpha: 0.8))
+        ctx.addPath(starPath)
+        ctx.setFillColor(CGColor(red: 1.0, green: 1.0, blue: 1.0, alpha: 0.98))
+        ctx.fillPath()
+        ctx.restoreGState()
+    }
+
+    drawSparkle(center: CGPoint(x: size * 0.76, y: size * 0.74), radius: 46 * s, haloColor: CGColor(red: 0.35, green: 0.95, blue: 0.85, alpha: 0.45))
+    drawSparkle(center: CGPoint(x: size * 0.84, y: size * 0.32), radius: 34 * s, haloColor: CGColor(red: 1.0, green: 0.90, blue: 0.40, alpha: 0.45))
+    drawSparkle(center: CGPoint(x: size * 0.24, y: size * 0.72), radius: 28 * s, haloColor: CGColor(red: 0.50, green: 1.0, blue: 0.70, alpha: 0.4))
+
+    return ctx.makeImage()
 }
 
-let icon = renderAppIcon(size: 1024)
-let appDirs = [
-    URL(fileURLWithPath: "/Applications/WhatsClean.app"),
-    FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/WhatsClean.app"),
-    FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Documents/WhatsClean/WhatsClean.app")
-]
+func saveCGImageAsPNG(image: CGImage, path: String) {
+    let url = URL(fileURLWithPath: path)
+    guard let dest = CGImageDestinationCreateWithURL(url as CFURL, "public.png" as CFString, 1, nil) else { return }
+    CGImageDestinationAddImage(dest, image, nil)
+    CGImageDestinationFinalize(dest)
+}
 
-for appURL in appDirs {
-    if FileManager.default.fileExists(atPath: appURL.path) {
-        _ = NSWorkspace.shared.setIcon(icon, forFile: appURL.path, options: [])
-    }
+if let img = createIconBitmap(pixels: 1024) {
+    let outputPath = CommandLine.arguments.dropFirst().first
+        ?? URL(fileURLWithPath: FileManager.default.currentDirectoryPath)
+            .appendingPathComponent("Resources/AppIcon.png").path
+    saveCGImageAsPNG(image: img, path: outputPath)
+    print("Ícone gerado em \(outputPath)")
 }
