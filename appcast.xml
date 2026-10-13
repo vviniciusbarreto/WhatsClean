@@ -12,6 +12,10 @@
             <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
             <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.1.2
 
+## macOS Golden Gate compatibility
+
+Updated for macOS Golden Gate, with automatic cleanup improvements validated on macOS 27.0.1 (Apple Silicon). The fixes focus on reliable scheduling after system updates, cleanup with the app closed, and handling access to WhatsApp media.
+
 ## Automatic cleanup fixes
 
 - Auto (7d) works with WhatsClean closed, including when its menu bar icon is disabled.
