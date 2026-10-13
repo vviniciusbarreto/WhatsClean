@@ -1,6 +1,6 @@
 cask "whatsclean" do
-  version "1.1.1"
-  sha256 "1bdaeaf2fdf5e85d228a12b6bd49b469df0fc375393225adf15dd609707b298f"
+  version "1.1.2"
+  sha256 "1a7cc5374938dcbefa3183d07de99b53a0ad0a5eaa04199d7abe785720a73ab9"
 
   url "https://github.com/vviniciusbarreto/WhatsClean/releases/download/v#{version}/WhatsClean-#{version}-arm64.zip"
   name "WhatsClean"

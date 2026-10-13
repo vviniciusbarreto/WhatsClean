@@ -1,0 +1,64 @@
+import Foundation
+@main struct CleanupTests {
+ @MainActor static func main() throws {
+  let fm = FileManager.default
+  let base = URL(fileURLWithPath: "/private/tmp/whatsclean-qa-\(UUID().uuidString)", isDirectory: true)
+  let root = base.appendingPathComponent("Media")
+  let reportRoot = base.appendingPathComponent("Reports")
+  try fm.createDirectory(at: root, withIntermediateDirectories: true)
+  setenv("WHATSCLEAN_QA_MEDIA_ROOT",root.path,1)
+  setenv("WHATSCLEAN_QA_REPORT_ROOT",reportRoot.path,1)
+  let old = Date().addingTimeInterval(-8*86400)
+  func expect(_ condition: Bool, _ name: String) {
+   if !condition { print("FAIL: \(name)"); exit(1) }
+   print("PASS: \(name)")
+  }
+  @discardableResult func file(_ name: String, date: Date, data: Data = Data(repeating: 65, count: 1024)) throws -> URL {
+   let u=root.appendingPathComponent(name)
+   try fm.createDirectory(at: u.deletingLastPathComponent(), withIntermediateDirectories: true)
+   try data.write(to:u)
+   try fm.setAttributes([.modificationDate:date],ofItemAtPath:u.path)
+   return u
+  }
+  let oldImage=try file("qa-old-\(UUID().uuidString).jpg",date:old)
+  let recent=try file("recent.pdf",date:Date())
+  let changed=try file("changed.jpg",date:old)
+  let oldThumb=try file("qa-thumb-\(UUID().uuidString).thumb",date:old,data:Data([0xFF,0xD8,0xFF])+Data(repeating:65,count:1024))
+  let sticker=try file("stickers/excluded.jpg",date:old)
+  let small=try file("tiny.jpg",date:old,data:Data(repeating:65,count:10))
+  let hidden=try file(".hidden.jpg",date:old)
+  let unknown=try file("unknown.was",date:old)
+  let outside=base.appendingPathComponent("outside.jpg")
+  try Data(repeating:65,count:1024).write(to:outside)
+  try fm.setAttributes([.modificationDate:old],ofItemAtPath:outside.path)
+  try fm.createSymbolicLink(at:root.appendingPathComponent("linked.jpg"),withDestinationURL:outside)
+  let scan=MediaScanner.scanSynchronously()
+  expect(scan.oldCount == 3 && scan.items.count == 4,"only recognized old media selected; exclusions and symlinks preserved")
+  expect(BackgroundCleanup.run(dryRun:true)==0 && fm.fileExists(atPath:oldImage.path),"dry run verifies access without removing files")
+  try fm.setAttributes([.modificationDate:Date()],ofItemAtPath:changed.path)
+  let deletion=BackgroundCleanup.trashEligibleItems(scan.items)
+  expect(deletion.deleted==2 && deletion.failed==0,"old media and supported thumbnails moved to Trash")
+  expect(!fm.fileExists(atPath:oldImage.path) && !fm.fileExists(atPath:oldThumb.path),"eligible files no longer in source")
+  expect([recent,changed,sticker,small,hidden,unknown,outside].allSatisfy {fm.fileExists(atPath:$0.path)},"recently modified files and excluded content preserved")
+  let locked=root.appendingPathComponent("blocked")
+  try fm.createDirectory(at:locked,withIntermediateDirectories:true)
+  _=try file("blocked/old.jpg",date:old)
+  let pending=try file("pending.jpg",date:old)
+  try fm.setAttributes([.posixPermissions:0],ofItemAtPath:locked.path)
+  let incomplete=MediaScanner.scanSynchronously()
+  expect(incomplete.enumerationErrors > 0,"unreadable subfolder detected instead of silent success")
+  expect(BackgroundCleanup.run(dryRun:false)==2 && fm.fileExists(atPath:pending.path),"incomplete scan fails without moving files")
+  try fm.setAttributes([.posixPermissions:0o700],ofItemAtPath:locked.path)
+  setenv("WHATSCLEAN_QA_MEDIA_ROOT",base.appendingPathComponent("Missing").path,1)
+  expect(BackgroundCleanup.run(dryRun:false)==2,"missing root returns nonzero error")
+  unsetenv("WHATSCLEAN_QA_MEDIA_ROOT")
+  expect(BackgroundCleanup.run(dryRun:false)==2,"missing authorization returns nonzero error")
+  UserDefaults.standard.setVolatileDomain(["autoCleanupEnabled":false],forName:UserDefaults.argumentDomain)
+  expect(BackgroundCleanup.run(dryRun:false)==0,"disabled preference prevents cleanup")
+  UserDefaults.standard.removeVolatileDomain(forName:UserDefaults.argumentDomain)
+  let cfg=AutoCleanupSchedule.configuration(executable:"/Applications/WhatsClean.app/Contents/MacOS/WhatsClean")
+  expect(cfg["StartInterval"]==nil && (cfg["StartCalendarInterval"] as? [String:Int]) == ["Hour":10,"Minute":0],"daily calendar schedule supports wake catch-up")
+  expect(cfg["RunAtLoad"] as? Bool == true && cfg["StandardErrorPath"] != nil && cfg["AssociatedBundleIdentifiers"] != nil,"login execution, logs and app association configured")
+  print("ALL TESTS PASSED. Fixture: \(base.path)")
+ }
+}

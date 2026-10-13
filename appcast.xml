@@ -3,6 +3,35 @@
     <channel>
         <title>WhatsClean</title>
         <item>
+            <title>1.1.2</title>
+            <pubDate>Tue, 13 Oct 2026 19:33:05 -0300</pubDate>
+            <link>https://github.com/vviniciusbarreto/WhatsClean</link>
+            <sparkle:version>8</sparkle:version>
+            <sparkle:shortVersionString>1.1.2</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.1.2
+
+## Automatic cleanup fixes
+
+- Auto (7d) works with WhatsClean closed, including when its menu bar icon is disabled.
+- Uses a daily calendar schedule at 10:00 local time, with catch-up after sleep and an immediate run when the schedule is loaded at login. Only recognized WhatsApp media older than seven days is moved to the Trash.
+- Repairs enabled schedules after app or macOS updates and uses modern launchd registration.
+- Keeps folder authorization active during both scanning and moves to the Trash.
+- Reports access failures and incomplete scans instead of silently treating them as successful cleanups. Local logs and JSON reports are available in `~/Library/Logs/WhatsClean/`.
+- Rechecks file age before moving items and preserves symbolic links and content outside the authorized media folder.
+- Adds a read-only diagnostic command and conditional permission guidance in Settings.
+
+## Validation
+
+- Twelve regression checks passed with synthetic files: selection/exclusions, read-only verification, Trash moves, preservation of recent or changed files, access failures, disabled cleanup, and calendar configuration.
+- Verified background execution with the app closed and a separate calendar-triggered read-only check on macOS 27.0.1.
+
+Apple Silicon · macOS 12 or later · version 1.1.2, build 8.
+]]></description>
+            <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.1.2/WhatsClean-1.1.2-arm64.zip" type="application/octet-stream" sparkle:edSignature="lHRQZxWPyeYNcJiCZLc5EnbPe+C0gtkvkB1QpMRez4Z9vBkLxEGdzOKFuJdeM/wciB7X6OQ059Vmom47qENqBg==" length="2370957"/>
+        </item>
+        <item>
             <title>1.1.1</title>
             <pubDate>Wed, 26 Aug 2026 17:24:43 -0300</pubDate>
             <link>https://github.com/vviniciusbarreto/WhatsClean</link>

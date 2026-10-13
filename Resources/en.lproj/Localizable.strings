@@ -98,3 +98,9 @@
 "Could not save %@: %@" = "Could not save %@: %@";
 "%lld file(s) moved to the Trash." = "%lld file(s) moved to the Trash.";
 "%lld file(s) moved to the Trash; %lld could not be moved. Check macOS permissions." = "%lld file(s) moved to the Trash; %lld could not be moved. Check macOS permissions.";
+
+"Automatic cleanup could not be disabled. Try again." = "Automatic cleanup could not be disabled. Try again.";
+
+"If automatic cleanup cannot access WhatsApp data, review WhatsClean in System Settings > Privacy & Security > Full Disk Access." = "If automatic cleanup cannot access WhatsApp data, review WhatsClean in System Settings > Privacy & Security > Full Disk Access.";
+
+"Open Privacy Settings…" = "Open Privacy Settings…";

@@ -1,4 +1,5 @@
 import SwiftUI
+import Combine
 import AppKit
 import Quartz
 import AVFoundation
@@ -81,140 +82,131 @@ final class QuickLookManager: NSObject, QLPreviewPanelDataSource, QLPreviewPanel
     }
 }
 
+enum AutoCleanupSchedule {
+    static let label = "com.vviniciusbarreto.whatsclean.autoclean"
+    static let revision = "2"
+    static var logDirectory: URL {
+        FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Library/Logs/WhatsClean", isDirectory: true)
+    }
+    static func configuration(executable: String) -> [String: Any] {
+        [
+            "Label": label,
+            "ProgramArguments": [executable, "--clean-7days"],
+            "RunAtLoad": true,
+            // Calendar jobs catch up on wake; StartInterval misses sleeping invocations.
+            "StartCalendarInterval": ["Hour": 10, "Minute": 0],
+            "ProcessType": "Background",
+            "AssociatedBundleIdentifiers": "com.vviniciusbarreto.whatsclean",
+            "StandardOutPath": logDirectory.appendingPathComponent("autoclean.log").path,
+            "StandardErrorPath": logDirectory.appendingPathComponent("autoclean-error.log").path
+        ]
+    }
+}
+
 final class AutoCleanerManager: ObservableObject {
     @Published var isEnabled: Bool = false
     @Published var feedbackMessage: String?
 
     private let preferenceKey = "autoCleanupEnabled"
     private let registeredBuildKey = "autoCleanupRegisteredBuild"
-    private let launchAgentLabel = "com.vviniciusbarreto.whatsclean.autoclean"
-
-    private let plistURL: URL = {
-        FileManager.default.homeDirectoryForCurrentUser
-            .appendingPathComponent("Library/LaunchAgents/com.vviniciusbarreto.whatsclean.autoclean.plist")
-    }()
+    private let registrationKey = "autoCleanupRegistrationVersion"
+    private let launchAgentLabel = AutoCleanupSchedule.label
+    private let plistURL = FileManager.default.homeDirectoryForCurrentUser
+        .appendingPathComponent("Library/LaunchAgents/\(AutoCleanupSchedule.label).plist")
+    private var domain: String { "gui/\(getuid())" }
+    private var service: String { "\(domain)/\(launchAgentLabel)" }
 
     private var executablePath: String {
-        let candidates = [
+        let candidates = [Bundle.main.executablePath ?? "",
             "/Applications/WhatsClean.app/Contents/MacOS/WhatsClean",
-            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/WhatsClean.app/Contents/MacOS/WhatsClean").path,
-            Bundle.main.executablePath ?? ""
-        ]
-        for c in candidates where FileManager.default.fileExists(atPath: c) {
-            return c
-        }
-        return candidates[0]
+            FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications/WhatsClean.app/Contents/MacOS/WhatsClean").path]
+        let applications = ["/Applications/", FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path + "/"]
+        return candidates.first(where: { candidate in
+            applications.contains(where: { candidate.hasPrefix($0) }) && FileManager.default.fileExists(atPath: candidate)
+        }) ?? ""
     }
 
-    init() {
-        checkStatus()
-    }
+    init() { checkStatus() }
 
     func checkStatus() {
         let defaults = UserDefaults.standard
         let plistExists = FileManager.default.fileExists(atPath: plistURL.path)
-        let storedPreference = defaults.object(forKey: preferenceKey) as? Bool
         let jobLoaded = isJobLoaded()
-
-        // Migrate pre-1.0.3 installations from their existing plist/job, then
-        // preserve the user's intent independently of updater file replacement.
-        let shouldBeEnabled = storedPreference ?? (plistExists || jobLoaded)
-        guard shouldBeEnabled else {
-            isEnabled = false
-            return
-        }
-
+        let shouldBeEnabled = defaults.object(forKey: preferenceKey) as? Bool ?? (plistExists || jobLoaded)
+        guard shouldBeEnabled else { isEnabled = false; return }
         defaults.set(true, forKey: preferenceKey)
-        let buildChanged = defaults.string(forKey: registeredBuildKey) != currentBuild
-        if !plistExists || !jobLoaded || buildChanged {
-            installSchedule(showFeedback: false)
-        } else {
-            isEnabled = true
+        let expected = AutoCleanupSchedule.configuration(executable: executablePath) as NSDictionary
+        let existing = (try? Data(contentsOf: plistURL)).flatMap {
+            try? PropertyListSerialization.propertyList(from: $0, options: [], format: nil) as? NSDictionary
         }
+        if !jobLoaded || existing != expected || defaults.string(forKey: registrationKey) != registrationVersion {
+            installSchedule(showFeedback: false)
+        } else { isEnabled = true }
     }
 
-    func enable() {
-        installSchedule(showFeedback: true)
-    }
+    func enable() { installSchedule(showFeedback: true) }
 
     private func installSchedule(showFeedback: Bool) {
-        let exe = executablePath
-        let applications = ["/Applications/", FileManager.default.homeDirectoryForCurrentUser.appendingPathComponent("Applications").path + "/"]
-        guard applications.contains(where: { exe.hasPrefix($0) }) else {
-            if showFeedback {
-                feedbackMessage = NSLocalizedString("Install WhatsClean in the Applications folder before enabling automatic cleanup.", comment: "Auto cleanup error")
-            }
+        guard !executablePath.isEmpty else {
+            feedbackMessage = NSLocalizedString("Install WhatsClean in the Applications folder before enabling automatic cleanup.", comment: "Auto cleanup error")
             isEnabled = false
             return
         }
-
-        let plist: [String: Any] = [
-            "Label": launchAgentLabel,
-            "ProgramArguments": [exe, "--clean-7days"],
-            "RunAtLoad": true,
-            "StartInterval": 86400
-        ]
         do {
-            if FileManager.default.fileExists(atPath: plistURL.path) || isJobLoaded() {
-                _ = runLaunchctl(["unload", plistURL.path])
+            try FileManager.default.createDirectory(at: AutoCleanupSchedule.logDirectory, withIntermediateDirectories: true)
+            try FileManager.default.createDirectory(at: plistURL.deletingLastPathComponent(), withIntermediateDirectories: true)
+            let data = try PropertyListSerialization.data(fromPropertyList: AutoCleanupSchedule.configuration(executable: executablePath), format: .xml, options: 0)
+            if isJobLoaded() {
+                let status = runLaunchctl(["bootout", service])
+                guard status == 0 else { throw scheduleError(status) }
             }
-            try FileManager.default.createDirectory(
-                at: plistURL.deletingLastPathComponent(),
-                withIntermediateDirectories: true
-            )
-            let data = try PropertyListSerialization.data(fromPropertyList: plist, format: .xml, options: 0)
             try data.write(to: plistURL, options: .atomic)
-            let status = runLaunchctl(["load", "-w", plistURL.path])
-            guard status == 0 else {
-                try? FileManager.default.removeItem(at: plistURL)
-                throw NSError(domain: "WhatsClean", code: Int(status), userInfo: [
-                    NSLocalizedDescriptionKey: "macOS refused to schedule automatic cleanup."
-                ])
-            }
+            let enableStatus = runLaunchctl(["enable", service])
+            guard enableStatus == 0 else { throw scheduleError(enableStatus) }
+            let status = runLaunchctl(["bootstrap", domain, plistURL.path])
+            guard status == 0, isJobLoaded() else { throw scheduleError(status) }
             isEnabled = true
             UserDefaults.standard.set(true, forKey: preferenceKey)
             UserDefaults.standard.set(currentBuild, forKey: registeredBuildKey)
-            if showFeedback {
-                feedbackMessage = NSLocalizedString("Daily automatic cleanup is enabled.", comment: "Auto cleanup enabled")
-            }
+            UserDefaults.standard.set(registrationVersion, forKey: registrationKey)
+            if showFeedback { feedbackMessage = NSLocalizedString("Daily automatic cleanup is enabled.", comment: "Auto cleanup enabled") }
         } catch {
             isEnabled = false
-            if showFeedback {
-                feedbackMessage = String(format: NSLocalizedString("Automatic cleanup could not be enabled: %@", comment: "Auto cleanup error"), error.localizedDescription)
-            }
+            feedbackMessage = String(format: NSLocalizedString("Automatic cleanup could not be enabled: %@", comment: "Auto cleanup error"), error.localizedDescription)
+            appLogger.error("Schedule registration failed: \(error.localizedDescription, privacy: .public)")
         }
     }
 
     func disable() {
-        _ = runLaunchctl(["unload", plistURL.path])
-        try? FileManager.default.removeItem(at: plistURL)
+        if isJobLoaded(), runLaunchctl(["bootout", service]) != 0 {
+            feedbackMessage = NSLocalizedString("Automatic cleanup could not be disabled. Try again.", comment: "Auto cleanup error")
+            return
+        }
+        do { if FileManager.default.fileExists(atPath: plistURL.path) { try FileManager.default.removeItem(at: plistURL) } }
+        catch { feedbackMessage = error.localizedDescription; return }
         UserDefaults.standard.set(false, forKey: preferenceKey)
         UserDefaults.standard.removeObject(forKey: registeredBuildKey)
-        self.isEnabled = false
+        UserDefaults.standard.removeObject(forKey: registrationKey)
+        isEnabled = false
         feedbackMessage = NSLocalizedString("Automatic cleanup is disabled.", comment: "Auto cleanup disabled")
     }
 
-    private var currentBuild: String {
-        Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown"
+    private var currentBuild: String { Bundle.main.object(forInfoDictionaryKey: "CFBundleVersion") as? String ?? "unknown" }
+    private var registrationVersion: String {
+        "\(AutoCleanupSchedule.revision)|\(currentBuild)|\(ProcessInfo.processInfo.operatingSystemVersionString)|\(executablePath)"
     }
-
-    private func isJobLoaded() -> Bool {
-        runLaunchctl(["print", "gui/\(getuid())/\(launchAgentLabel)"]) == 0
+    private func scheduleError(_ status: Int32) -> NSError {
+        NSError(domain: "WhatsClean", code: Int(status), userInfo: [NSLocalizedDescriptionKey: "macOS refused to schedule automatic cleanup (\(status))."])
     }
-
+    private func isJobLoaded() -> Bool { runLaunchctl(["print", service]) == 0 }
     private func runLaunchctl(_ arguments: [String]) -> Int32 {
         let process = Process()
         process.executableURL = URL(fileURLWithPath: "/bin/launchctl")
         process.arguments = arguments
         process.standardOutput = FileHandle.nullDevice
         process.standardError = FileHandle.nullDevice
-        do {
-            try process.run()
-            process.waitUntilExit()
-            return process.terminationStatus
-        } catch {
-            return -1
-        }
+        do { try process.run(); process.waitUntilExit(); return process.terminationStatus }
+        catch { return -1 }
     }
 }
 
@@ -247,21 +239,29 @@ enum WhatsAppFolderAccess {
 
         if let url = try? URL(
             resolvingBookmarkData: data,
-            options: [.withSecurityScope],
+            options: [.withSecurityScope, .withoutUI],
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) {
-            if isStale { try? save(url) }
+            if isStale {
+                let accessing = url.startAccessingSecurityScopedResource()
+                defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+                try? save(url)
+            }
             return url
         }
 
         if let url = try? URL(
             resolvingBookmarkData: data,
-            options: [],
+            options: [.withoutUI],
             relativeTo: nil,
             bookmarkDataIsStale: &isStale
         ) {
-            if isStale { try? save(url) }
+            if isStale {
+                let accessing = url.startAccessingSecurityScopedResource()
+                defer { if accessing { url.stopAccessingSecurityScopedResource() } }
+                try? save(url)
+            }
             return url
         }
         return nil
@@ -463,6 +463,7 @@ class MediaScanner: ObservableObject {
         let oldCount: Int
         let rootsFound: Int
         let inaccessibleRoots: Int
+        let enumerationErrors: Int
     }
 
     nonisolated private static func getMediaRoots() -> [URL] {
@@ -490,6 +491,7 @@ class MediaScanner: ObservableObject {
         var oldBytes: Int64 = 0
         var oldCount: Int = 0
         var inaccessibleRoots = 0
+        var enumerationErrors = 0
 
         let imageExts: Set<String> = ["jpg", "jpeg", "png", "gif", "svg", "psd", "ai", "heic", "webp", "bmp", "tiff"]
         let videoExts: Set<String> = ["mp4", "mov", "m4v", "mkv", "avi", "webm"]
@@ -497,14 +499,19 @@ class MediaScanner: ObservableObject {
         let docExts: Set<String> = ["pdf", "doc", "docx", "xls", "xlsx", "ppt", "pptx", "txt", "rtf", "zip", "rar", "7z", "tar", "gz", "csv"]
         let excludedDirs = ["avatars", "stickers", "profile", "profilepictures", "frameworks", "codesignature"]
 
-        let keys: [URLResourceKey] = [.isRegularFileKey, .fileSizeKey, .contentModificationDateKey]
+        let keys: [URLResourceKey] = [.isRegularFileKey, .isSymbolicLinkKey, .fileSizeKey, .contentModificationDateKey]
 
         for root in roots {
             guard FileManager.default.isReadableFile(atPath: root.path),
                   let enumerator = FileManager.default.enumerator(
                     at: root,
                     includingPropertiesForKeys: keys,
-                    options: [.skipsHiddenFiles, .skipsPackageDescendants]
+                    options: [.skipsHiddenFiles, .skipsPackageDescendants],
+                    errorHandler: { _, error in
+                        enumerationErrors += 1
+                        appLogger.error("Media enumeration failed: \(error.localizedDescription, privacy: .public)")
+                        return true
+                    }
                   ) else {
                 inaccessibleRoots += 1
                 continue
@@ -514,8 +521,11 @@ class MediaScanner: ObservableObject {
                 let pathLower = fileURL.path.lowercased()
                 if excludedDirs.contains(where: { pathLower.contains($0) }) { continue }
 
-                guard let res = try? fileURL.resourceValues(forKeys: Set(keys)),
-                      res.isRegularFile == true,
+                guard let res = try? fileURL.resourceValues(forKeys: Set(keys)) else {
+                    enumerationErrors += 1
+                    continue
+                }
+                guard res.isSymbolicLink != true, res.isRegularFile == true,
                       let size = res.fileSize,
                       let date = res.contentModificationDate,
                       size > 50 else { continue }
@@ -571,7 +581,8 @@ class MediaScanner: ObservableObject {
             oldBytes: oldBytes,
             oldCount: oldCount,
             rootsFound: roots.count,
-            inaccessibleRoots: inaccessibleRoots
+            inaccessibleRoots: inaccessibleRoots,
+            enumerationErrors: enumerationErrors
         )
     }
 
@@ -598,7 +609,7 @@ class MediaScanner: ObservableObject {
         olderThan7DaysSizeString = bcf.string(fromByteCount: result.oldBytes)
         if result.rootsFound == 0 {
             statusMessage = NSLocalizedString("Grant access to WhatsApp data to begin scanning.", comment: "Scanner status")
-        } else if result.inaccessibleRoots > 0 {
+        } else if result.inaccessibleRoots > 0 || result.enumerationErrors > 0 {
             statusMessage = NSLocalizedString("WhatsApp access is no longer available. Open WhatsClean Settings and grant folder access again.", comment: "Scanner status")
         } else {
             statusMessage = nil
@@ -607,17 +618,113 @@ class MediaScanner: ObservableObject {
 
     @discardableResult
     func deleteOlderThan7Days() -> (deleted: Int, failed: Int) {
-        var deleted = 0
-        var failed = 0
+        let deletion = BackgroundCleanup.trashEligibleItems(items)
+        scan()
+        return deletion
+    }
+}
+
+enum BackgroundCleanup {
+    struct Report: Codable {
+        let timestamp: Date
+        let dryRun: Bool
+        let status: String
+        let scanned: Int
+        let eligible: Int
+        let movedToTrash: Int
+        let failed: Int
+        let message: String
+    }
+
+    static var reportDirectory: URL {
+#if QA_TESTING
+        if let path = ProcessInfo.processInfo.environment["WHATSCLEAN_QA_REPORT_ROOT"] {
+            return URL(fileURLWithPath: path, isDirectory: true)
+        }
+#endif
+        return AutoCleanupSchedule.logDirectory
+    }
+
+    static func finish(dryRun: Bool, status: String, result: MediaScanner.ScanResult? = nil,
+                       moved: Int = 0, failed: Int = 0, message: String, exitCode: Int32) -> Int32 {
+        let report = Report(timestamp: Date(), dryRun: dryRun, status: status,
+                            scanned: result?.items.count ?? 0, eligible: result?.oldCount ?? 0,
+                            movedToTrash: moved, failed: failed, message: message)
+        let encoder = JSONEncoder()
+        encoder.dateEncodingStrategy = .iso8601
+        encoder.outputFormatting = [.prettyPrinted, .sortedKeys]
+        do {
+            try FileManager.default.createDirectory(at: reportDirectory, withIntermediateDirectories: true)
+            try encoder.encode(report).write(to: reportDirectory.appendingPathComponent(dryRun ? "last-check.json" : "last-cleanup.json"), options: .atomic)
+        } catch {
+            FileHandle.standardError.write(Data("Could not save cleanup report: \(error.localizedDescription)\n".utf8))
+        }
+        print("\(ISO8601DateFormatter().string(from: report.timestamp)) status=\(status) scanned=\(report.scanned) eligible=\(report.eligible) moved=\(moved) failed=\(failed) \(message)")
+        if exitCode != 0 {
+            FileHandle.standardError.write(Data("\(message)\n".utf8))
+            appLogger.error("Automatic cleanup failed: \(message, privacy: .public)")
+        }
+        return exitCode
+    }
+
+    static func run(dryRun: Bool) -> Int32 {
+        if !dryRun, UserDefaults.standard.object(forKey: "autoCleanupEnabled") as? Bool == false {
+            return finish(dryRun: dryRun, status: "disabled", message: "Automatic cleanup is disabled.", exitCode: 0)
+        }
+        // Retain the folder grant for both enumeration and moves to the Trash.
+        let folder = WhatsAppFolderAccess.resolveURL()
+        let accessing = folder?.startAccessingSecurityScopedResource() == true
+        defer { if accessing { folder?.stopAccessingSecurityScopedResource() } }
+        let result = MediaScanner.scanSynchronously()
+        guard result.rootsFound > 0 else {
+            return finish(dryRun: dryRun, status: "access-required", result: result,
+                          message: "Open WhatsClean Settings and grant access to the WhatsApp media folder.", exitCode: 2)
+        }
+        guard result.inaccessibleRoots == 0, result.enumerationErrors == 0 else {
+            return finish(dryRun: dryRun, status: "access-denied", result: result,
+                          message: "WhatsApp media could not be fully read. Reauthorize the folder in WhatsClean. For unattended cleanup, check WhatsClean in System Settings > Privacy & Security > Full Disk Access.", exitCode: 2)
+        }
+        if dryRun {
+            return finish(dryRun: true, status: "verified", result: result,
+                          message: "Access verified; no files were moved.", exitCode: 0)
+        }
+        let deletion = trashEligibleItems(result.items)
+        return finish(dryRun: false, status: deletion.failed == 0 ? "success" : "partial-failure", result: result,
+                      moved: deletion.deleted, failed: deletion.failed,
+                      message: deletion.failed == 0 ? "Cleanup completed." : "Some eligible files could not be moved to the Trash.",
+                      exitCode: deletion.failed == 0 ? 0 : 1)
+    }
+
+    static func trashEligibleItems(_ items: [MediaItem]) -> (deleted: Int, failed: Int) {
+        let folder = WhatsAppFolderAccess.resolveURL()
+        let accessing = folder?.startAccessingSecurityScopedResource() == true
+        defer { if accessing { folder?.stopAccessingSecurityScopedResource() } }
+        let root: URL?
+#if QA_TESTING
+        root = ProcessInfo.processInfo.environment["WHATSCLEAN_QA_MEDIA_ROOT"].map { URL(fileURLWithPath: $0, isDirectory: true) }
+#else
+        root = WhatsAppFolderAccess.authorizedMediaRoot()
+#endif
+        guard let root else { return (0, items.filter(\.isOlderThan7Days).count) }
+        let prefix = root.resolvingSymlinksInPath().standardizedFileURL.path + "/"
+        let cutoff = Date().addingTimeInterval(-7 * 86400)
+        let keys: Set<URLResourceKey> = [.isRegularFileKey, .isSymbolicLinkKey, .contentModificationDateKey]
+        var deleted = 0, failed = 0
         for item in items where item.isOlderThan7Days {
             do {
+                guard item.url.resolvingSymlinksInPath().standardizedFileURL.path.hasPrefix(prefix) else {
+                    failed += 1; continue
+                }
+                let values = try URL(fileURLWithPath: item.url.path).resourceValues(forKeys: keys)
+                guard values.isRegularFile == true, values.isSymbolicLink != true,
+                      let modified = values.contentModificationDate, modified < cutoff else { continue }
                 try FileManager.default.trashItem(at: item.url, resultingItemURL: nil)
                 deleted += 1
             } catch {
                 failed += 1
+                appLogger.error("Trash move failed: \(error.localizedDescription, privacy: .public)")
             }
         }
-        scan()
         return (deleted, failed)
     }
 }
@@ -1087,6 +1194,12 @@ struct WhatsCleanSettingsView: View {
                 Text("WhatsClean remembers this choice and reuses it on future launches.")
                     .font(.caption)
                     .foregroundColor(.secondary)
+                Text("If automatic cleanup cannot access WhatsApp data, review WhatsClean in System Settings > Privacy & Security > Full Disk Access.")
+                    .font(.caption)
+                    .foregroundColor(.secondary)
+                Button("Open Privacy Settings…") {
+                    NSWorkspace.shared.open(URL(string: "x-apple.systempreferences:com.apple.preference.security?Privacy_AllFiles")!)
+                }
             }
 
             Section("General") {
@@ -1420,13 +1533,16 @@ struct WhatsCleanApp: App {
     @AppStorage("appAppearance") private var appAppearance = AppAppearance.system.rawValue
 
     init() {
+        if CommandLine.arguments.contains("--verify-auto-cleanup") {
+            exit(BackgroundCleanup.run(dryRun: true))
+        }
+        if CommandLine.arguments.contains("--repair-auto-schedule") {
+            let manager = AutoCleanerManager()
+            print(manager.feedbackMessage ?? (manager.isEnabled ? "Automatic cleanup schedule is registered." : "Automatic cleanup is disabled."))
+            exit(manager.isEnabled ? 0 : 1)
+        }
         if CommandLine.arguments.contains("--clean-7days") {
-            let scanner = MediaScanner()
-            let result = MediaScanner.scanSynchronously()
-            scanner.items = result.items
-            let deletion = scanner.deleteOlderThan7Days()
-            appLogger.info("Automatic cleanup finished: \(deletion.deleted) moved, \(deletion.failed) failed")
-            exit(deletion.failed == 0 ? 0 : 1)
+            exit(BackgroundCleanup.run(dryRun: false))
         }
     }
 
