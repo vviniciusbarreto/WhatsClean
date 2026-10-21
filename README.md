@@ -6,17 +6,13 @@ Built for Apple Silicon and macOS 12 or later.
 
 ## Latest release
 
-### WhatsClean 1.1.2 — macOS Golden Gate improvements
+### WhatsClean 1.1.3 — clearer confirmation and localization
 
-Updated for macOS Golden Gate and validated on macOS 27.0.1 (Apple Silicon).
+- Moving selected files to the Trash now shows the number of files and the space you will recover before you confirm.
+- The WhatsApp folder access window and its alerts follow your macOS language, including Brazilian Portuguese.
+- Regression tests use only synthetic files and can no longer reach a real WhatsApp folder authorization; automated macOS checks run on every change.
 
-- Reliable Auto (7d) cleanup with the app closed and its menu bar icon disabled.
-- Daily cleanup at 10:00 local time, with catch-up after sleep and execution at login; only recognized media older than seven days goes to the Trash.
-- Schedule repair after app or macOS updates.
-- Folder access retained through scanning and cleanup, with clear reports for access failures or incomplete scans.
-- File age rechecked before cleanup; recently changed files, symbolic links, and content outside the authorized media folder are preserved.
-
-The regression tests and a calendar-triggered background check passed. [Full release notes](https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v1.1.2).
+Automatic cleanup, scheduling, and Trash behavior are unchanged. [Full release notes](https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v1.1.3).
 
 To receive the update notice and release notes, open WhatsClean with automatic update checks enabled, or use **Check for Updates**. A fully quit app runs only its scheduled cleanup; it does not check for updates.
 
@@ -103,7 +99,7 @@ The tests use synthetic media in a temporary folder, including recoverable moves
 ## Create a release
 
 ```bash
-./scripts/release.sh 1.1.2 8
+./scripts/release.sh 1.1.3 9
 ```
 
 The Sparkle private signing key remains in the macOS Keychain and must never be committed or shared.
