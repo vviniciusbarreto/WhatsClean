@@ -39,3 +39,5 @@ echo "  $PUBLIC_DIR/$ARCHIVE_NAME"
 echo "  $PUBLIC_DIR/WhatsClean-${VERSION}-arm64.dmg"
 echo "  $ROOT/appcast.xml"
 echo "SHA-256: $(shasum -a 256 "$RELEASE_DIR/$ARCHIVE_NAME" | awk '{print $1}')"
+
+"$ROOT/scripts/update-cask.sh" "$VERSION"

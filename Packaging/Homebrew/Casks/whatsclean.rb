@@ -13,10 +13,8 @@ cask "whatsclean" do
   app "WhatsClean.app"
 
   caveats <<~EOS
-    Version 1.1.2 includes automatic cleanup fixes for macOS Golden Gate,
-    validated on macOS 27.0.1. Cleanup works with the app closed and catches
-    up after sleep. Release notes:
-    https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v1.1.2
+    Release notes:
+    https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v#{version}
 
     WhatsClean is not Apple-notarized, so macOS may require approval on first
     launch. Try opening the app, then use System Settings > Privacy & Security >

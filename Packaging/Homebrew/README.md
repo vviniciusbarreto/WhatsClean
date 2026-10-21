@@ -29,4 +29,8 @@ brew update
 brew upgrade --cask whatsclean
 ```
 
-Update `version` and `sha256` in `Casks/whatsclean.rb` for every release.
+`scripts/release.sh` updates `version` and `sha256` in `Packaging/Homebrew/Casks/whatsclean.rb`. Copy the cask to the tap with:
+
+```bash
+./scripts/update-cask.sh VERSION /path/to/homebrew-tap
+```
