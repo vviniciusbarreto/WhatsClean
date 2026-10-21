@@ -3,6 +3,35 @@
     <channel>
         <title>WhatsClean</title>
         <item>
+            <title>1.1.3</title>
+            <pubDate>Wed, 21 Oct 2026 00:33:31 -0300</pubDate>
+            <link>https://github.com/vviniciusbarreto/WhatsClean</link>
+            <sparkle:version>9</sparkle:version>
+            <sparkle:shortVersionString>1.1.3</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.1.3
+
+## Clearer confirmation
+
+- When you move selected files to the Trash, the confirmation now shows the number of files and the space you will recover, as the seven-day cleanup already did.
+
+## Localization
+
+- The WhatsApp folder access window and its alerts now follow your macOS language, including Brazilian Portuguese.
+
+## Reliability
+
+- Test builds can no longer reach a real WhatsApp folder authorization; regression tests use only synthetic files.
+- Every change now runs through automated macOS checks: compilation, thirteen regression tests, packaging, and code signature validation.
+
+Automatic cleanup, scheduling, and Trash behavior are unchanged.
+
+Apple Silicon · macOS 12 or later · version 1.1.3, build 9.
+]]></description>
+            <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.1.3/WhatsClean-1.1.3-arm64.zip" length="2477500" type="application/octet-stream" sparkle:edSignature="m3yRELWqNd+NVqf0D6SxK9TbcDhOTIJjiBZ22WwN5N9fMf0fPYns3V5/I1uIJLtz5kexST0Sfi+TXthba1wNCQ=="/>
+        </item>
+        <item>
             <title>1.1.2</title>
             <pubDate>Tue, 13 Oct 2026 19:33:05 -0300</pubDate>
             <link>https://github.com/vviniciusbarreto/WhatsClean</link>
