@@ -1,6 +1,6 @@
 cask "whatsclean" do
-  version "1.1.2"
-  sha256 "1a7cc5374938dcbefa3183d07de99b53a0ad0a5eaa04199d7abe785720a73ab9"
+  version "1.1.3"
+  sha256 "be046302eeb9c54d7f4c58f2263e224e9efb72e4066db833f2f89c18f9c84d3f"
 
   url "https://github.com/vviniciusbarreto/WhatsClean/releases/download/v#{version}/WhatsClean-#{version}-arm64.zip"
   name "WhatsClean"
@@ -13,10 +13,8 @@ cask "whatsclean" do
   app "WhatsClean.app"
 
   caveats <<~EOS
-    Version 1.1.2 includes automatic cleanup fixes for macOS Golden Gate,
-    validated on macOS 27.0.1. Cleanup works with the app closed and catches
-    up after sleep. Release notes:
-    https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v1.1.2
+    Release notes:
+    https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v#{version}
 
     WhatsClean is not Apple-notarized, so macOS may require approval on first
     launch. Try opening the app, then use System Settings > Privacy & Security >
