@@ -27,6 +27,7 @@ fi
     --download-url-prefix "https://github.com/vviniciusbarreto/WhatsClean/releases/download/v${VERSION}/" \
     --link "https://github.com/vviniciusbarreto/WhatsClean" \
     --embed-release-notes \
+    --maximum-versions 0 \
     -o "$ROOT/appcast.xml" \
     "$RELEASE_DIR"
 
@@ -39,3 +40,5 @@ echo "  $PUBLIC_DIR/$ARCHIVE_NAME"
 echo "  $PUBLIC_DIR/WhatsClean-${VERSION}-arm64.dmg"
 echo "  $ROOT/appcast.xml"
 echo "SHA-256: $(shasum -a 256 "$RELEASE_DIR/$ARCHIVE_NAME" | awk '{print $1}')"
+
+"$ROOT/scripts/update-cask.sh" "$VERSION"

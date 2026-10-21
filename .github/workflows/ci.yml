@@ -13,7 +13,7 @@ jobs:
     runs-on: macos-15
     timeout-minutes: 30
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v5
 
       - name: Toolchain
         run: |
@@ -46,3 +46,14 @@ jobs:
           hdiutil verify WhatsClean.dmg
           unzip -tq WhatsClean-macOS.zip
           xmllint --noout appcast.xml
+
+      - name: Cask update script
+        run: |
+          set -euo pipefail
+          mkdir -p ReleaseAssets/0.0.0-ci "$RUNNER_TEMP/tap/Casks"
+          cp WhatsClean-macOS.zip ReleaseAssets/0.0.0-ci/WhatsClean-0.0.0-ci-arm64.zip
+          ./scripts/update-cask.sh 0.0.0-ci "$RUNNER_TEMP/tap"
+          cmp Packaging/Homebrew/Casks/whatsclean.rb "$RUNNER_TEMP/tap/Casks/whatsclean.rb"
+          grep -q "$(shasum -a 256 WhatsClean-macOS.zip | awk '{print $1}')" "$RUNNER_TEMP/tap/Casks/whatsclean.rb"
+          ruby -c "$RUNNER_TEMP/tap/Casks/whatsclean.rb"
+          git checkout -- Packaging/Homebrew/Casks/whatsclean.rb
