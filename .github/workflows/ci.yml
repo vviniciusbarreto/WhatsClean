@@ -1,0 +1,48 @@
+name: CI
+
+on:
+  push:
+    branches: [main]
+  pull_request:
+
+permissions:
+  contents: read
+
+jobs:
+  test-and-build:
+    runs-on: macos-15
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: Toolchain
+        run: |
+          sw_vers
+          xcrun swiftc --version
+          uname -m
+
+      - name: Install Sparkle (pinned SHA-256)
+        run: ./scripts/install-sparkle.sh
+
+      - name: Regression tests (synthetic files only)
+        run: ./scripts/test.sh
+
+      - name: Ad-hoc build and package
+        run: VERSION=0.0.0-ci BUILD_NUMBER=0 ./build.sh
+
+      - name: Validate bundle structure
+        run: |
+          set -euo pipefail
+          APP=WhatsClean.app
+          test -x "$APP/Contents/MacOS/WhatsClean"
+          test -d "$APP/Contents/Frameworks/Sparkle.framework"
+          test -f "$APP/Contents/Resources/en.lproj/Localizable.strings"
+          test -f "$APP/Contents/Resources/pt-BR.lproj/Localizable.strings"
+          plutil -lint "$APP/Contents/Info.plist" Resources/*.lproj/Localizable.strings
+          /usr/libexec/PlistBuddy -c "Print :SUFeedURL" "$APP/Contents/Info.plist"
+          /usr/libexec/PlistBuddy -c "Print :SUPublicEDKey" "$APP/Contents/Info.plist"
+          test "$(lipo -archs "$APP/Contents/MacOS/WhatsClean")" = "arm64"
+          codesign --verify --deep --strict "$APP"
+          hdiutil verify WhatsClean.dmg
+          unzip -tq WhatsClean-macOS.zip
+          xmllint --noout appcast.xml

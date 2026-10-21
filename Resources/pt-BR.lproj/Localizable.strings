@@ -86,7 +86,7 @@
 "Clean 7d+ (%lld)" = "Limpar 7d+ (%lld)";
 "%lld file(s) • Total: %@" = "%lld arquivo(s) • Total: %@";
 "Found %lld file(s) older than seven days (%@). They will be moved to the Trash to free up space." = "Foram encontrados %lld arquivo(s) com mais de sete dias (%@). Eles serão movidos para o Lixo para liberar espaço.";
-"The %lld selected file(s) will be moved to the Trash." = "Os %lld arquivo(s) selecionados serão movidos para o Lixo.";
+"The %lld selected file(s) (%@) will be moved to the Trash." = "Os %lld arquivo(s) selecionados (%@) serão movidos para o Lixo.";
 "Version %@" = "Versão %@";
 "Updated %@" = "Atualizado às %@";
 "Install WhatsClean in the Applications folder before enabling automatic cleanup." = "Instale o WhatsClean na pasta Aplicativos antes de ativar a limpeza automática.";
@@ -104,3 +104,10 @@
 "If automatic cleanup cannot access WhatsApp data, review WhatsClean in System Settings > Privacy & Security > Full Disk Access." = "Se a limpeza automática não conseguir acessar os dados do WhatsApp, confira a permissão do WhatsClean em Ajustes do Sistema > Privacidade e Segurança > Acesso Total ao Disco.";
 
 "Open Privacy Settings…" = "Abrir Ajustes de Privacidade…";
+
+/* Folder access */
+"WhatsClean has opened the expected WhatsApp media folder. Click Grant Access to continue." = "O WhatsClean abriu a pasta de mídia do WhatsApp esperada. Clique em Autorizar acesso para continuar.";
+"Grant Access" = "Autorizar acesso";
+"Choose the WhatsApp Folder" = "Escolha a pasta do WhatsApp";
+"For your safety, WhatsClean only accepts the official WhatsApp or WhatsApp Business data folder. No other app folders will be scanned." = "Por segurança, o WhatsClean só aceita a pasta de dados oficial do WhatsApp ou do WhatsApp Business. Nenhuma pasta de outro app será analisada.";
+"Access Could Not Be Saved" = "Não foi possível salvar o acesso";
