@@ -86,7 +86,7 @@
 "Clean 7d+ (%lld)" = "Clean 7d+ (%lld)";
 "%lld file(s) • Total: %@" = "%lld file(s) • Total: %@";
 "Found %lld file(s) older than seven days (%@). They will be moved to the Trash to free up space." = "Found %lld file(s) older than seven days (%@). They will be moved to the Trash to free up space.";
-"The %lld selected file(s) will be moved to the Trash." = "The %lld selected file(s) will be moved to the Trash.";
+"The %lld selected file(s) (%@) will be moved to the Trash." = "The %lld selected file(s) (%@) will be moved to the Trash.";
 "Version %@" = "Version %@";
 "Updated %@" = "Updated %@";
 "Install WhatsClean in the Applications folder before enabling automatic cleanup." = "Install WhatsClean in the Applications folder before enabling automatic cleanup.";
@@ -104,3 +104,10 @@
 "If automatic cleanup cannot access WhatsApp data, review WhatsClean in System Settings > Privacy & Security > Full Disk Access." = "If automatic cleanup cannot access WhatsApp data, review WhatsClean in System Settings > Privacy & Security > Full Disk Access.";
 
 "Open Privacy Settings…" = "Open Privacy Settings…";
+
+/* Folder access */
+"WhatsClean has opened the expected WhatsApp media folder. Click Grant Access to continue." = "WhatsClean has opened the expected WhatsApp media folder. Click Grant Access to continue.";
+"Grant Access" = "Grant Access";
+"Choose the WhatsApp Folder" = "Choose the WhatsApp Folder";
+"For your safety, WhatsClean only accepts the official WhatsApp or WhatsApp Business data folder. No other app folders will be scanned." = "For your safety, WhatsClean only accepts the official WhatsApp or WhatsApp Business data folder. No other app folders will be scanned.";
+"Access Could Not Be Saved" = "Access Could Not Be Saved";

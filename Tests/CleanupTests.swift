@@ -20,6 +20,7 @@ import Foundation
    try fm.setAttributes([.modificationDate:date],ofItemAtPath:u.path)
    return u
   }
+  expect(WhatsAppFolderAccess.resolveURL()==nil && WhatsAppFolderAccess.authorizedMediaRoot()==nil,"QA build never resolves a real WhatsApp folder grant")
   let oldImage=try file("qa-old-\(UUID().uuidString).jpg",date:old)
   let recent=try file("recent.pdf",date:Date())
   let changed=try file("changed.jpg",date:old)

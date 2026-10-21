@@ -234,6 +234,10 @@ enum WhatsAppFolderAccess {
     }
 
     static func resolveURL() -> URL? {
+#if QA_TESTING
+        // Test builds never touch a real WhatsApp folder grant.
+        return nil
+#else
         guard let data = UserDefaults.standard.data(forKey: bookmarkKey) else { return nil }
         var isStale = false
 
@@ -265,14 +269,15 @@ enum WhatsAppFolderAccess {
             return url
         }
         return nil
+#endif
     }
 
     @MainActor
     static func requestAccess() -> Bool {
         let panel = NSOpenPanel()
-        panel.title = "Grant WhatsApp Access"
-        panel.message = "WhatsClean has opened the expected WhatsApp media folder. Click Grant Access to continue."
-        panel.prompt = "Grant Access"
+        panel.title = NSLocalizedString("Grant WhatsApp Access", comment: "Folder access panel title")
+        panel.message = NSLocalizedString("WhatsClean has opened the expected WhatsApp media folder. Click Grant Access to continue.", comment: "Folder access panel message")
+        panel.prompt = NSLocalizedString("Grant Access", comment: "Folder access panel button")
         panel.canChooseFiles = false
         panel.canChooseDirectories = true
         panel.allowsMultipleSelection = false
@@ -287,8 +292,8 @@ enum WhatsAppFolderAccess {
         guard authorizedMediaRoot(from: selectedURL) != nil else {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Choose the WhatsApp Folder"
-            alert.informativeText = "For your safety, WhatsClean only accepts the official WhatsApp or WhatsApp Business data folder. No other app folders will be scanned."
+            alert.messageText = NSLocalizedString("Choose the WhatsApp Folder", comment: "Invalid folder alert title")
+            alert.informativeText = NSLocalizedString("For your safety, WhatsClean only accepts the official WhatsApp or WhatsApp Business data folder. No other app folders will be scanned.", comment: "Invalid folder alert message")
             alert.runModal()
             return false
         }
@@ -299,7 +304,7 @@ enum WhatsAppFolderAccess {
         } catch {
             let alert = NSAlert()
             alert.alertStyle = .warning
-            alert.messageText = "Access Could Not Be Saved"
+            alert.messageText = NSLocalizedString("Access Could Not Be Saved", comment: "Bookmark save error title")
             alert.informativeText = error.localizedDescription
             alert.runModal()
             return false
@@ -1000,7 +1005,7 @@ struct ContentView: View {
             Button("Move to Trash", role: .destructive) { deleteSelected() }
             Button("Cancel", role: .cancel) { }
         } message: {
-            Text(String(format: NSLocalizedString("The %lld selected file(s) will be moved to the Trash.", comment: "Selected files cleanup confirmation"), Int64(selectedItems.count)))
+            Text(String(format: NSLocalizedString("The %lld selected file(s) (%@) will be moved to the Trash.", comment: "Selected files cleanup confirmation"), Int64(getSelectedItems().count), selectedSizeString))
         }
         .alert("Operation Result", isPresented: Binding(
             get: { operationMessage != nil },
@@ -1041,8 +1046,16 @@ struct ContentView: View {
         SettingsWindowController.shared.show()
     }
 
+    private func getSelectedItems() -> [MediaItem] {
+        scanner.items.filter { selectedItems.contains($0.id) }
+    }
+
     private func getSelectedURLs() -> [URL] {
-        return scanner.items.filter { selectedItems.contains($0.id) }.map { $0.url }
+        getSelectedItems().map { $0.url }
+    }
+
+    private var selectedSizeString: String {
+        ByteCountFormatter.string(fromByteCount: getSelectedItems().reduce(0) { $0 + $1.size }, countStyle: .file)
     }
 
     private func quickLookSelected() {
