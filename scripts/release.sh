@@ -27,6 +27,7 @@ fi
     --download-url-prefix "https://github.com/vviniciusbarreto/WhatsClean/releases/download/v${VERSION}/" \
     --link "https://github.com/vviniciusbarreto/WhatsClean" \
     --embed-release-notes \
+    --maximum-versions 0 \
     -o "$ROOT/appcast.xml" \
     "$RELEASE_DIR"
 
