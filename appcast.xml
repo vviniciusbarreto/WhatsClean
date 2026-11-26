@@ -3,6 +3,29 @@
     <channel>
         <title>WhatsClean</title>
         <item>
+            <title>1.1.4</title>
+            <pubDate>Wed, 25 Nov 2026 23:02:04 -0300</pubDate>
+            <link>https://github.com/vviniciusbarreto/WhatsClean</link>
+            <sparkle:version>10</sparkle:version>
+            <sparkle:shortVersionString>1.1.4</sparkle:shortVersionString>
+            <sparkle:minimumSystemVersion>12.0</sparkle:minimumSystemVersion>
+            <sparkle:hardwareRequirements>arm64</sparkle:hardwareRequirements>
+            <description sparkle:format="markdown"><![CDATA[# WhatsClean 1.1.4
+
+## Security hardening
+
+- WhatsClean now runs with the macOS Hardened Runtime, which blocks code injection through environment variables and debugger attachment.
+- Every release now includes a `SHA256SUMS.txt` file, so you can confirm that your download matches the official build before opening it.
+- Installation instructions now recommend Homebrew, which verifies each download automatically, and explain how to check a manual download.
+- The automated macOS checks now fail any build that is missing the Hardened Runtime, and the CI actions are pinned to exact versions.
+
+Automatic cleanup, scheduling, and Trash behavior are unchanged.
+
+Apple Silicon · macOS 12 or later · version 1.1.4, build 10.
+]]></description>
+            <enclosure url="https://github.com/vviniciusbarreto/WhatsClean/releases/download/v1.1.4/WhatsClean-1.1.4-arm64.zip" length="2478533" type="application/octet-stream" sparkle:edSignature="utRvjRvBZYVepOyJfVAmm1t4kLxSDyP87o9rTlWAg6528AHttyrhGsmBXpNBRf2MztSdOUXHzKD7rUzl+j3oBw=="/>
+        </item>
+        <item>
             <title>1.1.3</title>
             <pubDate>Wed, 21 Oct 2026 00:33:31 -0300</pubDate>
             <link>https://github.com/vviniciusbarreto/WhatsClean</link>

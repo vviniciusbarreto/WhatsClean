@@ -35,9 +35,12 @@ mkdir -p "$PUBLIC_DIR"
 ditto "$RELEASE_DIR/$ARCHIVE_NAME" "$PUBLIC_DIR/$ARCHIVE_NAME"
 ditto "$ROOT/WhatsClean.dmg" "$PUBLIC_DIR/WhatsClean-${VERSION}-arm64.dmg"
 
+(cd "$PUBLIC_DIR" && shasum -a 256 "$ARCHIVE_NAME" "WhatsClean-${VERSION}-arm64.dmg" > SHA256SUMS.txt)
+
 echo "Release prepared:"
 echo "  $PUBLIC_DIR/$ARCHIVE_NAME"
 echo "  $PUBLIC_DIR/WhatsClean-${VERSION}-arm64.dmg"
+echo "  $PUBLIC_DIR/SHA256SUMS.txt"
 echo "  $ROOT/appcast.xml"
 echo "SHA-256: $(shasum -a 256 "$RELEASE_DIR/$ARCHIVE_NAME" | awk '{print $1}')"
 

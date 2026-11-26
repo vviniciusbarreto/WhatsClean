@@ -5,6 +5,17 @@ Compatibility: Apple Silicon Macs (M1, M2, M3, M4, or newer).
 WhatsClean is free and is not notarized by Apple. Because of this, macOS may
 block only the first launch. This does not mean the file is damaged.
 
+CHECK THE DOWNLOAD FIRST
+
+Download WhatsClean only from github.com/vviniciusbarreto/WhatsClean/releases.
+Each release includes SHA256SUMS.txt. In Terminal, in the folder with the
+download and SHA256SUMS.txt, run:
+
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+
+Continue only if your file shows OK. Homebrew users get this check
+automatically: brew install --cask vviniciusbarreto/tap/whatsclean
+
 INSTALL
 
 1. Drag WhatsClean.app to the Applications shortcut in this DMG.
@@ -21,6 +32,7 @@ IF MACOS STILL BLOCKS THE APP
 5. Confirm with Touch ID or your Mac password.
 
 LAST RESORT — ONLY IF THE OPTIONS ABOVE ARE UNAVAILABLE
+AND THE CHECKSUM ABOVE SHOWED OK
 
 Make sure the app is in Applications. Open Terminal, copy the full command
 below, press Return, and open WhatsClean again:

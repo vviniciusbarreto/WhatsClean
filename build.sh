@@ -104,10 +104,18 @@ if [[ "$SIGNING_IDENTITY" != "-" ]]; then
         --entitlements "$ROOT/Resources/WhatsClean.entitlements" "$APP"
 else
     echo "Warning: this local ad-hoc build requires manual Gatekeeper approval on first launch."
-    codesign --force --sign - --entitlements "$ROOT/Resources/WhatsClean.entitlements" "$APP"
+    # Hardened Runtime on the ad-hoc build too. Ad-hoc signatures have no Team ID,
+    # so library validation would reject the bundled Sparkle.framework; the
+    # ad-hoc entitlements disable only that check (see the file for details).
+    codesign --force --sign - --options runtime --entitlements "$ROOT/Resources/WhatsClean-adhoc.entitlements" "$APP"
 fi
 
 codesign --verify --deep --strict --verbose=2 "$APP"
+SIGNATURE_INFO="$(codesign -dv "$APP" 2>&1)"
+if [[ "$SIGNATURE_INFO" != *"runtime"* ]]; then
+    echo "Hardened Runtime is missing from $APP" >&2
+    exit 1
+fi
 
 STAGE="$BUILD_DIR/dmg"
 rm -rf "$STAGE" "$DMG" "$ZIP"
