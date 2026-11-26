@@ -6,13 +6,13 @@ Built for Apple Silicon and macOS 12 or later.
 
 ## Latest release
 
-### WhatsClean 1.1.3 — clearer confirmation and localization
+### WhatsClean 1.1.4 — security hardening
 
-- Moving selected files to the Trash now shows the number of files and the space you will recover before you confirm.
-- The WhatsApp folder access window and its alerts follow your macOS language, including Brazilian Portuguese.
-- Regression tests use only synthetic files and can no longer reach a real WhatsApp folder authorization; automated macOS checks run on every change.
+- The app now runs with the macOS Hardened Runtime, which blocks code injection through environment variables and debugger attachment.
+- Every release now ships a `SHA256SUMS.txt` file so you can confirm that your download matches the official build.
+- Installation instructions now recommend Homebrew, which verifies the download automatically.
 
-Automatic cleanup, scheduling, and Trash behavior are unchanged. [Full release notes](https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v1.1.3).
+Automatic cleanup, scheduling, and Trash behavior are unchanged. [Full release notes](https://github.com/vviniciusbarreto/WhatsClean/releases/tag/v1.1.4).
 
 To receive the update notice and release notes, open WhatsClean with automatic update checks enabled, or use **Check for Updates**. A fully quit app runs only its scheduled cleanup; it does not check for updates.
 
@@ -40,17 +40,37 @@ All file scanning and cleanup happen locally on your Mac. WhatsClean does not up
 
 ## Install
 
-Download the latest DMG from [GitHub Releases](https://github.com/vviniciusbarreto/WhatsClean/releases/latest), open it, and drag **WhatsClean** to **Applications**.
+### Recommended: Homebrew
+
+```bash
+brew install --cask vviniciusbarreto/tap/whatsclean
+```
+
+Homebrew downloads the official release and checks its SHA-256 checksum before installing.
+
+### Manual download
+
+Download the latest DMG or ZIP from [GitHub Releases](https://github.com/vviniciusbarreto/WhatsClean/releases/latest) only. Do not install WhatsClean from other websites or re-uploads.
+
+Before opening it, confirm that the file matches the official build. Download `SHA256SUMS.txt` from the same release and run, in the folder where you saved both files:
+
+```bash
+shasum -a 256 -c SHA256SUMS.txt --ignore-missing
+```
+
+The result must say `OK` for your file. If it does not, delete the download.
+
+Then open the DMG and drag **WhatsClean** to **Applications**.
 
 Because the app is distributed without paid Apple notarization, macOS may block the first launch. Try opening the app once, then go to **System Settings > Privacy & Security** and choose **Open Anyway**.
 
-If that option is unavailable, open Terminal and run:
+Only if that option is unavailable, and only after the checksum above says `OK`, open Terminal and run:
 
 ```bash
 xattr -dr com.apple.quarantine /Applications/WhatsClean.app
 ```
 
-This is required only for the first launch after installation.
+This removes the download quarantine from WhatsClean only. Never disable Gatekeeper or change your Mac's global security settings. It is required only for the first launch after installation.
 
 On the first app launch, click **Grant WhatsApp Access**. WhatsClean opens the
 expected WhatsApp data location automatically; select the highlighted folder
@@ -99,7 +119,7 @@ The tests use synthetic media in a temporary folder, including recoverable moves
 ## Create a release
 
 ```bash
-./scripts/release.sh 1.1.3 9
+./scripts/release.sh 1.1.4 10
 ```
 
 The Sparkle private signing key remains in the macOS Keychain and must never be committed or shared.
